@@ -18,7 +18,12 @@ No markdown, no explanation — JSON only.`,
 };
 
 // Analyze a clothing image; base64Data is a base64-encoded string, mediaType e.g. "image/jpeg"
-async function analyzeImage(base64Data, mediaType) {
+// contextQuery is an optional text description to give Claude extra context
+async function analyzeImage(base64Data, mediaType, contextQuery = null) {
+  const textPrompt = contextQuery
+    ? `Identify this clothing item. Additional context: "${contextQuery}". Return the JSON.`
+    : 'Identify this clothing item and return the JSON.';
+
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 256,
@@ -31,7 +36,7 @@ async function analyzeImage(base64Data, mediaType) {
             type: 'image',
             source: { type: 'base64', media_type: mediaType, data: base64Data }
           },
-          { type: 'text', text: 'Identify this clothing item and return the JSON.' }
+          { type: 'text', text: textPrompt }
         ]
       }
     ]

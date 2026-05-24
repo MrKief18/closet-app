@@ -35,7 +35,8 @@ router.post('/', upload.single('image'), async (req, res) => {
 
   try {
     const base64 = req.file.buffer.toString('base64');
-    const details = await analyzeImage(base64, req.file.mimetype);
+    const contextQuery = req.body.query || null;
+    const details = await analyzeImage(base64, req.file.mimetype, contextQuery);
 
     if (req.query.save === 'true') {
       const items = readItems();

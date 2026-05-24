@@ -63,8 +63,8 @@ router.get('/:id', (req, res) => {
 // Body: { name, category, color, size, brand? }
 router.post('/', (req, res) => {
   const { name, category, color, size, brand } = req.body;
-  if (!name || !category || !color || !size) {
-    return res.status(400).json({ error: 'name, category, color, and size are required' });
+  if (!name || !category || !color) {
+    return res.status(400).json({ error: 'name, category, and color are required' });
   }
   const items = readItems();
   const newItem = {
