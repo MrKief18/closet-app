@@ -1,6 +1,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const { searchItem } = require('../services/ai');
 
 const router = express.Router();
 const DB_PATH = path.join(__dirname, '../data/closet.json');
@@ -22,6 +23,32 @@ router.get('/', (req, res) => {
     items = items.filter(i => i.category.toLowerCase() === req.query.category.toLowerCase());
   }
   res.json(items);
+});
+
+// GET /items/search?q= — use Claude to look up clothing details from a text query
+// Add ?save=true to auto-add the result to the closet
+router.get('/search', async (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.status(400).json({ error: 'Query parameter q is required' });
+  try {
+    const details = await searchItem(q);
+
+    if (req.query.save === 'true') {
+      const items = readItems();
+      const newItem = {
+        id: Date.now().toString(),
+        ...details,
+        addedAt: new Date().toISOString()
+      };
+      items.push(newItem);
+      writeItems(items);
+      return res.status(201).json({ query: q, details, saved: newItem });
+    }
+
+    res.json({ query: q, details });
+  } catch (err) {
+    res.status(500).json({ error: 'Search failed', detail: err.message });
+  }
 });
 
 // GET /items/:id — get a single item by id
