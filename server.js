@@ -1,11 +1,15 @@
 require('dotenv').config();
 const express = require('express');
+const path = require('path');
 const itemsRouter = require('./routes/items');
 const outfitsRouter = require('./routes/outfits');
 const uploadRouter = require('./routes/upload');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Serve the web frontend
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Parse incoming JSON request bodies
 app.use(express.json());
@@ -19,10 +23,6 @@ app.use('/outfits', outfitsRouter);
 // Mount camera/image upload route (Claude Vision analysis)
 app.use('/upload', uploadRouter);
 
-// Health check
-app.get('/', (req, res) => {
-  res.json({ message: 'Closet API is running', version: '1.0.0' });
-});
 
 app.listen(PORT, () => {
   console.log(`Closet app running at http://localhost:${PORT}`);

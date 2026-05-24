@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Closet App</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header>
+    <div class="logo">👕 Closet</div>
+    <nav>
+      <button class="tab active" data-view="closet">My Closet</button>
+      <button class="tab" data-view="outfits">Outfits</button>
+      <button class="tab" data-view="add">+ Add Item</button>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ── Closet View ── -->
+    <section id="view-closet" class="view active">
+      <div class="filter-bar">
+        <button class="filter active" data-cat="">All</button>
+        <button class="filter" data-cat="tops">Tops</button>
+        <button class="filter" data-cat="bottoms">Bottoms</button>
+        <button class="filter" data-cat="shoes">Shoes</button>
+        <button class="filter" data-cat="outerwear">Outerwear</button>
+        <button class="filter" data-cat="accessories">Accessories</button>
+      </div>
+      <div id="items-grid" class="items-grid"></div>
+    </section>
+
+    <!-- ── Outfits View ── -->
+    <section id="view-outfits" class="view">
+      <div class="section-header">
+        <h2>Saved Outfits</h2>
+        <button id="btn-new-outfit" class="btn-primary">+ New Outfit</button>
+      </div>
+      <div id="outfits-list" class="outfits-list"></div>
+    </section>
+
+    <!-- ── Add Item View ── -->
+    <section id="view-add" class="view">
+      <div class="add-options">
+        <button class="add-option-btn" id="btn-show-camera">
+          <span class="option-icon">📷</span>
+          <span class="option-label">Camera / Upload</span>
+          <span class="option-sub">Take a photo or upload from your device</span>
+        </button>
+        <button class="add-option-btn" id="btn-show-search">
+          <span class="option-icon">🔍</span>
+          <span class="option-label">Search</span>
+          <span class="option-sub">Describe an item and AI fills in the details</span>
+        </button>
+      </div>
+
+      <!-- Camera panel -->
+      <div id="panel-camera" class="input-panel hidden">
+        <input type="file" id="camera-input" accept="image/*" class="hidden">
+        <div id="image-preview-wrap" class="image-preview-wrap hidden">
+          <img id="preview-img" src="" alt="Preview">
+        </div>
+        <button id="btn-choose-photo" class="btn-secondary">Choose Photo</button>
+        <button id="btn-analyze" class="btn-primary hidden">Analyze with AI</button>
+        <div id="camera-loading" class="loading hidden">Analyzing photo…</div>
+        <div id="camera-error" class="error-msg hidden"></div>
+      </div>
+
+      <!-- Search panel -->
+      <div id="panel-search" class="input-panel hidden">
+        <div class="search-row">
+          <input type="text" id="search-input" placeholder="e.g. black leather jacket, white Nike sneakers…" class="text-field">
+          <button id="btn-do-search" class="btn-primary">Look Up</button>
+        </div>
+        <div id="search-loading" class="loading hidden">Looking up item…</div>
+        <div id="search-error" class="error-msg hidden"></div>
+      </div>
+
+      <!-- Identified item form (shared by camera + search) -->
+      <div id="identified-form" class="identified-form hidden">
+        <h3>Identified Item <span class="form-hint">Edit any details before saving</span></h3>
+        <div class="form-grid">
+          <label>Name<input type="text" id="f-name"></label>
+          <label>Category
+            <select id="f-category">
+              <option value="tops">Tops</option>
+              <option value="bottoms">Bottoms</option>
+              <option value="shoes">Shoes</option>
+              <option value="outerwear">Outerwear</option>
+              <option value="accessories">Accessories</option>
+            </select>
+          </label>
+          <label>Color<input type="text" id="f-color"></label>
+          <label>Size<input type="text" id="f-size" placeholder="optional"></label>
+          <label>Brand<input type="text" id="f-brand" placeholder="optional"></label>
+        </div>
+        <div class="form-actions">
+          <button id="btn-save-item" class="btn-primary">Add to Closet</button>
+          <button id="btn-discard" class="btn-secondary">Discard</button>
+        </div>
+        <div id="save-error" class="error-msg hidden"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── New Outfit Modal ── -->
+  <div id="outfit-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h2>Build an Outfit</h2>
+      <input type="text" id="outfit-name-input" placeholder="Outfit name…" class="text-field">
+      <p class="modal-sub">Tap items to include them in this outfit:</p>
+      <div id="modal-items-grid" class="items-grid selectable"></div>
+      <div id="outfit-error" class="error-msg hidden"></div>
+      <div class="modal-actions">
+        <button id="btn-save-outfit" class="btn-primary">Save Outfit</button>
+        <button id="btn-cancel-outfit" class="btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
