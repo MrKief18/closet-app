@@ -93,41 +93,65 @@ main { padding: 24px; max-width: 960px; margin: 0 auto; }
 /* ── Items Grid ── */
 .items-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: var(--gap);
 }
 
 .item-card {
+  aspect-ratio: 3/4;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 12px;
   overflow: hidden;
-  transition: border-color 0.15s, transform 0.1s;
   position: relative;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
 }
-.item-card:hover { border-color: #444; transform: translateY(-1px); }
+.item-card:hover {
+  border-color: #555;
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+}
 
-.item-icon {
-  height: 90px;
+/* Cards with a real photo: image fills the whole card */
+.item-card.has-image .item-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s;
+}
+.item-card.has-image:hover .item-img { transform: scale(1.04); }
+
+/* Gradient overlay at the bottom of image cards */
+.item-overlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 45%, transparent 100%);
+  padding: 52px 12px 14px;
+}
+.item-overlay .item-name { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-overlay .item-meta { font-size: 11px; color: rgba(255,255,255,0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 5px; }
+.item-overlay .item-cat-badge { font-size: 9px; }
+.item-overlay .item-tags { margin-top: 5px; }
+.item-overlay .tag-chip { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.75); }
+.item-overlay .item-wear { color: #4ade80; }
+
+/* Cards without a photo: emoji + text stacked */
+.item-card:not(.has-image) .item-icon {
+  height: 58%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 38px;
+  font-size: 52px;
 }
+.item-card:not(.has-image) .item-info { padding: 0 12px 12px; }
 
-.item-img {
-  width: 100%;
-  height: 120px;
-  object-fit: cover;
-  display: block;
-}
-
-.item-info { padding: 10px 12px 12px; }
-.item-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Shared text styles (used in .item-info for no-image cards) */
+.item-name { font-size: 13px; font-weight: 600; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item-meta { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item-cat-badge {
   display: inline-block;
-  margin-top: 6px;
+  margin-top: 5px;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -136,39 +160,69 @@ main { padding: 24px; max-width: 960px; margin: 0 auto; }
   font-weight: 600;
 }
 
-.btn-delete {
+/* Find Image button for cards without a photo */
+.btn-find-img {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--blue);
+  background: rgba(96,165,250,0.1);
+  border: 1px solid rgba(96,165,250,0.3);
+  border-radius: 20px;
+  padding: 3px 9px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background 0.15s;
+}
+.btn-find-img:hover { background: rgba(96,165,250,0.22); }
+.btn-find-img:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Delete + wear buttons — visible on hover, work for both card types */
+.btn-delete, .btn-wear {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  background: rgba(0,0,0,0.5);
+  top: 8px;
+  background: rgba(0,0,0,0.6);
   border: none;
-  color: var(--muted);
-  width: 22px;
-  height: 22px;
+  color: rgba(255,255,255,0.7);
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   cursor: pointer;
-  font-size: 14px;
-  line-height: 1;
+  font-size: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.15s, color 0.15s;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  backdrop-filter: blur(4px);
 }
-.item-card:hover .btn-delete { opacity: 1; }
-.btn-delete:hover { color: var(--red); }
+.btn-delete { right: 8px; }
+.btn-wear   { right: 40px; }
+.item-card:hover .btn-delete,
+.item-card:hover .btn-wear { opacity: 1; }
+.btn-delete:hover { color: var(--red); background: rgba(248,113,113,0.2); }
+.btn-wear:hover   { color: var(--green); background: rgba(52,211,153,0.2); }
 
 /* Selectable item cards (outfit builder) */
 .selectable .item-card { cursor: pointer; }
-.selectable .item-card.selected { border-color: var(--blue); background: rgba(96,165,250,.1); }
+.selectable .item-card.selected { border-color: var(--blue); }
 .selectable .item-card.selected::after {
   content: '✓';
   position: absolute;
-  top: 6px;
-  right: 8px;
-  color: var(--blue);
+  top: 8px;
+  right: 10px;
+  color: #fff;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 15px;
+  background: var(--blue);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
 }
 
 /* Empty state */
@@ -194,18 +248,40 @@ main { padding: 24px; max-width: 960px; margin: 0 auto; }
 .outfit-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px 18px;
+  border-radius: 12px;
+  padding: 14px 16px;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  gap: 14px;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.outfit-name { font-weight: 600; margin-bottom: 8px; }
-.outfit-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.outfit-card:hover { border-color: #555; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+
+.outfit-thumbs { display: flex; gap: 3px; flex-shrink: 0; }
+.outfit-thumb {
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 7px;
+  flex-shrink: 0;
+}
+.outfit-thumb-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.outfit-body { flex: 1; min-width: 0; }
+.outfit-name { font-weight: 600; margin-bottom: 6px; }
+.outfit-items { display: flex; flex-wrap: wrap; gap: 5px; }
 .outfit-chip {
-  font-size: 12px;
-  padding: 3px 10px;
+  font-size: 11px;
+  padding: 2px 9px;
   border-radius: 20px;
   background: var(--surface2);
   border: 1px solid var(--border);
@@ -216,11 +292,17 @@ main { padding: 24px; max-width: 960px; margin: 0 auto; }
   border: none;
   color: var(--muted);
   cursor: pointer;
-  font-size: 18px;
+  font-size: 20px;
   flex-shrink: 0;
-  transition: color 0.15s;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: color 0.15s, background 0.15s;
 }
-.btn-delete-outfit:hover { color: var(--red); }
+.btn-delete-outfit:hover { color: var(--red); background: rgba(248,113,113,0.1); }
 
 /* ── Add Item ── */
 .add-options {

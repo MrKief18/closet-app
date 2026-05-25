@@ -5,15 +5,17 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Cached system prompt — same for both image analysis and text search
 const SYSTEM_PROMPT = {
   type: 'text',
-  text: `You are a clothing identification assistant. When given an image or text description of a clothing item, respond ONLY with a valid JSON object using exactly these fields:
+  text: `You are an expert fashion and clothing identification assistant.
+
+When given an image or text description of a clothing item, respond ONLY with valid JSON:
 {
-  "name": "descriptive item name (e.g. Slim Fit Chinos, Graphic Tee)",
+  "name": "specific product name — be as precise as possible, as if writing a product listing someone would search to buy this exact item (e.g. 'Air Force 1 Low' not 'Sneakers', 'Slim Straight Leg Jeans' not 'Jeans', 'Oversized Zip-Up Hoodie' not 'Hoodie'). Include style/fit/silhouette when relevant.",
   "category": "one of: tops | bottoms | shoes | outerwear | accessories",
-  "color": "primary color or color combo",
-  "size": "size if visible or mentioned, otherwise null",
-  "brand": "brand name if visible or mentioned, otherwise null"
+  "color": "specific color (e.g. 'triple white', 'washed indigo', 'bone' — not just 'white' or 'blue')",
+  "size": "exact size if visible or mentioned, otherwise null",
+  "brand": "exact official brand name if identifiable (e.g. 'Nike', 'Levi's', 'Zara'), otherwise null"
 }
-No markdown, no explanation — JSON only.`,
+No markdown, no explanation, no extra fields — JSON only.`,
   cache_control: { type: 'ephemeral' }
 };
 
@@ -57,25 +59,47 @@ async function searchItem(query) {
   return JSON.parse(response.content[0].text);
 }
 
-// Search Unsplash for a real clothing photo.
-// Requires UNSPLASH_ACCESS_KEY in .env — returns null if not configured.
+// Find a real product photo. Tries Google Custom Search first (accurate product images),
+// falls back to Unsplash. Returns null if neither is configured.
 async function findProductImage(details) {
-  const key = process.env.UNSPLASH_ACCESS_KEY;
-  if (!key) return null;
-
-  const q = [details.brand, details.name, details.color, details.category]
+  // Build the tightest possible query: brand + product name + color — no category noise
+  const q = [details.brand, details.name, details.color]
     .filter(Boolean)
     .join(' ');
 
-  try {
-    const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(q)}&per_page=1&client_id=${key}`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.results?.[0]?.urls?.small || null;
-  } catch {
-    return null;
+  // ── Google Custom Search (best for real product images) ──────────────────────
+  const googleKey = process.env.GOOGLE_API_KEY;
+  const googleCx  = process.env.GOOGLE_CSE_ID;
+  if (googleKey && googleCx) {
+    try {
+      const url = `https://www.googleapis.com/customsearch/v1` +
+        `?key=${googleKey}&cx=${googleCx}` +
+        `&q=${encodeURIComponent(q + ' product')}&searchType=image` +
+        `&num=1&imgType=photo&safe=active&imgSize=medium`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        const link = data.items?.[0]?.link;
+        if (link) return link;
+      }
+    } catch {}
   }
+
+  // ── Unsplash fallback ────────────────────────────────────────────────────────
+  const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
+  if (unsplashKey) {
+    try {
+      const url = `https://api.unsplash.com/search/photos` +
+        `?query=${encodeURIComponent(q)}&per_page=1&client_id=${unsplashKey}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        return data.results?.[0]?.urls?.small || null;
+      }
+    } catch {}
+  }
+
+  return null;
 }
 
 // Ask Claude to pick a complete outfit from the user's wardrobe for a given occasion

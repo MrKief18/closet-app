@@ -107,6 +107,22 @@ router.post('/:id/wear', (req, res) => {
   res.json(items[idx]);
 });
 
+// POST /items/:id/image — fetch and attach a product image for an existing item
+router.post('/:id/image', async (req, res) => {
+  const items = readItems();
+  const idx = items.findIndex(i => i.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Item not found' });
+  try {
+    const imageUrl = await findProductImage(items[idx]);
+    if (!imageUrl) return res.status(404).json({ error: 'No image found for this item' });
+    items[idx].imageUrl = imageUrl;
+    writeItems(items);
+    res.json(items[idx]);
+  } catch (err) {
+    res.status(500).json({ error: 'Image search failed', detail: err.message });
+  }
+});
+
 // DELETE /items/:id — remove an item from the closet
 router.delete('/:id', (req, res) => {
   const items = readItems();

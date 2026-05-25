@@ -98,26 +98,42 @@ function renderItemGrid(containerId, items, selectable) {
   grid.innerHTML = items.map(item => {
     const color = catColor(item.category);
     const meta = [item.color, item.size, item.brand].filter(Boolean).join(' · ');
-    const thumb = item.imageUrl
-      ? `<img class="item-img" src="${esc(item.imageUrl)}" alt="${esc(item.name)}">`
-      : `<div class="item-icon" style="background:${color}22">${catIcon(item.category)}</div>`;
     const tags = (item.tags || []).map(t => `<span class="tag-chip">${esc(t)}</span>`).join('');
     const wearInfo = item.wearCount ? `<div class="item-wear">worn ${item.wearCount}×</div>` : '';
-    return `
-      <div class="item-card" data-id="${item.id}" data-category="${item.category}">
-        ${thumb}
-        <div class="item-info">
-          <div class="item-name">${esc(item.name)}</div>
-          <div class="item-meta">${esc(meta)}</div>
-          <span class="item-cat-badge" style="background:${color}22;color:${color}">${item.category}</span>
-          ${tags ? `<div class="item-tags">${tags}</div>` : ''}
-          ${wearInfo}
-        </div>
-        ${selectable ? '' : `
-          <button class="btn-wear" data-id="${item.id}" title="Log as worn today">✓</button>
-          <button class="btn-delete" data-id="${item.id}" title="Remove">×</button>
-        `}
-      </div>`;
+    const actionBtns = selectable ? '' : `
+      <button class="btn-wear" data-id="${item.id}" title="Log as worn today">✓</button>
+      <button class="btn-delete" data-id="${item.id}" title="Remove">×</button>`;
+
+    if (item.imageUrl) {
+      // Full-bleed image card with gradient overlay
+      return `
+        <div class="item-card has-image" data-id="${item.id}" data-category="${item.category}">
+          <img class="item-img" src="${esc(item.imageUrl)}" alt="${esc(item.name)}">
+          <div class="item-overlay">
+            <div class="item-name">${esc(item.name)}</div>
+            <div class="item-meta">${esc(meta)}</div>
+            <span class="item-cat-badge" style="background:${color}44;color:${color}">${item.category}</span>
+            ${tags ? `<div class="item-tags">${tags}</div>` : ''}
+            ${wearInfo}
+          </div>
+          ${actionBtns}
+        </div>`;
+    } else {
+      // No-image card: emoji + info stacked, with Find Image button
+      return `
+        <div class="item-card" data-id="${item.id}" data-category="${item.category}">
+          <div class="item-icon" style="background:${color}22">${catIcon(item.category)}</div>
+          <div class="item-info">
+            <div class="item-name">${esc(item.name)}</div>
+            <div class="item-meta">${esc(meta)}</div>
+            <span class="item-cat-badge" style="background:${color}22;color:${color}">${item.category}</span>
+            ${tags ? `<div class="item-tags">${tags}</div>` : ''}
+            ${wearInfo}
+            ${selectable ? '' : `<button class="btn-find-img" data-id="${item.id}">🔍 Find Image</button>`}
+          </div>
+          ${actionBtns}
+        </div>`;
+    }
   }).join('');
 
   if (selectable) {
@@ -139,6 +155,9 @@ function renderItemGrid(containerId, items, selectable) {
     });
     grid.querySelectorAll('.btn-wear').forEach(btn => {
       btn.addEventListener('click', e => { e.stopPropagation(); wearItem(btn.dataset.id); });
+    });
+    grid.querySelectorAll('.btn-find-img').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); findImageForItem(btn); });
     });
   }
 }
@@ -163,6 +182,21 @@ async function wearItem(id) {
   }
 }
 
+async function findImageForItem(btn) {
+  const id = btn.dataset.id;
+  btn.disabled = true;
+  btn.textContent = 'Searching…';
+  try {
+    await apiFetch(`/items/${id}/image`, { method: 'POST' });
+    showToast('Image found!');
+    loadCloset();
+  } catch {
+    showToast('No image found for this item', true);
+    btn.disabled = false;
+    btn.textContent = '🔍 Find Image';
+  }
+}
+
 // ── Outfits ───────────────────────────────────────────────────────────────────
 
 async function loadOutfits() {
@@ -173,16 +207,24 @@ async function loadOutfits() {
       list.innerHTML = '<p class="empty-state">No outfits saved yet — build one!</p>';
       return;
     }
-    list.innerHTML = outfits.map(o => `
-      <div class="outfit-card" data-id="${o.id}">
-        <div>
-          <div class="outfit-name">${esc(o.name)}</div>
-          <div class="outfit-items">
-            ${(o.items || []).map(i => `<span class="outfit-chip">${esc(i.name || '?')}</span>`).join('')}
+    list.innerHTML = outfits.map(o => {
+      const thumbs = (o.items || []).slice(0, 4).map(i =>
+        i.imageUrl
+          ? `<img class="outfit-thumb" src="${esc(i.imageUrl)}" alt="${esc(i.name || '')}">`
+          : `<div class="outfit-thumb-icon" style="background:${catColor(i.category)}22">${catIcon(i.category)}</div>`
+      ).join('');
+      return `
+        <div class="outfit-card" data-id="${o.id}">
+          <div class="outfit-thumbs">${thumbs}</div>
+          <div class="outfit-body">
+            <div class="outfit-name">${esc(o.name)}</div>
+            <div class="outfit-items">
+              ${(o.items || []).map(i => `<span class="outfit-chip">${esc(i.name || '?')}</span>`).join('')}
+            </div>
           </div>
-        </div>
-        <button class="btn-delete-outfit" data-id="${o.id}" title="Delete">×</button>
-      </div>`).join('');
+          <button class="btn-delete-outfit" data-id="${o.id}" title="Delete">×</button>
+        </div>`;
+    }).join('');
 
     list.querySelectorAll('.btn-delete-outfit').forEach(btn => {
       btn.addEventListener('click', () => deleteOutfit(btn.dataset.id));

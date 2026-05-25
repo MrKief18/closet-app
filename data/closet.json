@@ -1,11 +1,62 @@
 [
   {
-    "id": "1779670565218",
-    "name": "Yeezy Boost 350 V2 Zebra",
+    "id": "1779672194615",
+    "name": "Classic White T-Shirt",
+    "category": "tops",
+    "color": "white",
+    "size": "OS",
+    "brand": "Brandy Melville",
+    "imageUrl": "https://images.unsplash.com/photo-1564925211110-1e22668653b3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5NjAwNjZ8MHwxfHNlYXJjaHwxfHxCcmFuZHklMjBNZWx2aWxsZSUyMENsYXNzaWMlMjBXaGl0ZSUyMFQtU2hpcnQlMjB3aGl0ZSUyMHRvcHN8ZW58MHx8fHwxNzc5NjcyMTgzfDA&ixlib=rb-4.1.0&q=80&w=400",
+    "tags": [
+      "casual"
+    ],
+    "wearCount": 0,
+    "lastWorn": null,
+    "addedAt": "2026-05-25T01:23:14.615Z"
+  },
+  {
+    "id": "1779672218586",
+    "name": "Yeezy Boost 350 V2 Zebra Sneaker",
     "category": "shoes",
-    "color": "White/Core Black",
+    "color": "white, black, and red",
     "size": "11",
     "brand": "Adidas Yeezy",
-    "addedAt": "2026-05-25T00:56:05.218Z"
+    "imageUrl": "/uploads/1779672211727.webp",
+    "tags": [
+      "casual"
+    ],
+    "wearCount": 0,
+    "lastWorn": null,
+    "addedAt": "2026-05-25T01:23:38.586Z"
+  },
+  {
+    "id": "1779672255591",
+    "name": "Hugh Clean Indigo Jean",
+    "category": "bottoms",
+    "color": "indigo",
+    "size": "25",
+    "brand": "Anine Bing",
+    "imageUrl": "https://images.unsplash.com/photo-1598554747436-c9293d6a588f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5NjAwNjZ8MHwxfHNlYXJjaHwxfHxBbmluZSUyMEJpbmclMjBIdWdoJTIwQ2xlYW4lMjBJbmRpZ28lMjBKZWFuJTIwaW5kaWdvJTIwYm90dG9tc3xlbnwwfHx8fDE3Nzk2NzIyNDV8MA&ixlib=rb-4.1.0&q=80&w=400",
+    "tags": [
+      "casual"
+    ],
+    "wearCount": 0,
+    "lastWorn": null,
+    "addedAt": "2026-05-25T01:24:15.591Z"
+  },
+  {
+    "id": "1779672305625",
+    "name": "Yuma Jacket",
+    "category": "outerwear",
+    "color": "brown",
+    "size": "xs",
+    "brand": "Anine Bing",
+    "imageUrl": null,
+    "tags": [
+      "casual"
+    ],
+    "wearCount": 0,
+    "lastWorn": null,
+    "addedAt": "2026-05-25T01:25:05.625Z"
   }
 ]
