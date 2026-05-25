@@ -21,6 +21,27 @@ router.get('/', (req, res) => {
   res.json(items);
 });
 
+// GET /items/shopping?q= — Google Shopping results for an exact query string (color-specific re-fetch)
+router.get('/shopping', async (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.status(400).json({ error: 'q is required' });
+  const serpKey = process.env.SERPAPI_KEY;
+  if (!serpKey) return res.json({ products: [] });
+  try {
+    const url = `https://serpapi.com/search.json?engine=google_shopping&q=${encodeURIComponent(q)}&num=6&api_key=${serpKey}`;
+    const r = await fetch(url);
+    if (!r.ok) return res.json({ products: [] });
+    const data = await r.json();
+    const products = (data.shopping_results || []).slice(0, 6).map(p => ({
+      title: p.title, price: p.price || null,
+      source: p.source || null, thumbnail: p.thumbnail || null, link: p.link || null
+    }));
+    res.json({ products });
+  } catch (err) {
+    res.status(500).json({ error: 'Shopping search failed', detail: err.message });
+  }
+});
+
 // GET /items/search?q= — identify product from description + return Google Shopping results
 router.get('/search', async (req, res) => {
   const { q } = req.query;

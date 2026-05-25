@@ -915,14 +915,35 @@ function renderColorVariants(variants, details) {
 
       const v = variants[idx];
       identifiedImageUrl = v.imageUrl || null;
-
-      // Update form with this color and pre-fill
       populateIdentifiedForm({ ...details, color: v.color });
+
+      // Re-fetch shopping results specific to this color
+      fetchColorShopping(details, v.color);
     });
   });
 
   // Auto-select the first card
   grid.querySelector('.color-variant-card')?.click();
+}
+
+async function fetchColorShopping(details, color) {
+  const shoppingEl = document.getElementById('shopping-results');
+  const loadingEl  = document.getElementById('search-loading');
+  shoppingEl.classList.add('hidden');
+  loadingEl.classList.remove('hidden');
+
+  const q = [details.brand, details.name, color].filter(Boolean).join(' ');
+  try {
+    const data = await apiFetch(`/items/shopping?q=${encodeURIComponent(q)}`);
+    loadingEl.classList.add('hidden');
+    if (data.products && data.products.length > 0) {
+      renderShoppingResults(data.products, details, null);
+    } else {
+      shoppingEl.classList.add('hidden');
+    }
+  } catch {
+    loadingEl.classList.add('hidden');
+  }
 }
 
 function renderShoppingResults(products, fallbackDetails, fallbackImageUrl) {
