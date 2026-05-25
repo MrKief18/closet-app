@@ -62,7 +62,7 @@ router.get('/:id', (req, res) => {
 // POST /items — add a new clothing item
 // Body: { name, category, color, size, brand? }
 router.post('/', (req, res) => {
-  const { name, category, color, size, brand } = req.body;
+  const { name, category, color, size, brand, imageUrl } = req.body;
   if (!name || !category || !color || !size) {
     return res.status(400).json({ error: 'name, category, color, and size are required' });
   }
@@ -74,6 +74,7 @@ router.post('/', (req, res) => {
     color,
     size,
     brand: brand || null,
+    imageUrl: imageUrl || null,
     addedAt: new Date().toISOString()
   };
   items.push(newItem);
@@ -86,7 +87,7 @@ router.patch('/:id', (req, res) => {
   const items = readItems();
   const idx = items.findIndex(i => i.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Item not found' });
-  const allowed = ['name', 'category', 'color', 'size', 'brand'];
+  const allowed = ['name', 'category', 'color', 'size', 'brand', 'imageUrl'];
   allowed.forEach(field => {
     if (req.body[field] !== undefined) items[idx][field] = req.body[field];
   });

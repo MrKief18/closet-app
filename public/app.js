@@ -16,6 +16,7 @@ function catColor(cat) { return CAT_COLOR[cat] || '#6b7280'; }
 let currentFilter = '';
 let selectedOutfitItems = new Set();
 let selectedPhotoFile = null;
+let identifiedImageUrl = null;
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 
@@ -74,9 +75,12 @@ function renderItemGrid(containerId, items, selectable) {
   grid.innerHTML = items.map(item => {
     const color = catColor(item.category);
     const meta = [item.color, item.size, item.brand].filter(Boolean).join(' · ');
+    const thumb = item.imageUrl
+      ? `<img class="item-img" src="${esc(item.imageUrl)}" alt="${esc(item.name)}">`
+      : `<div class="item-icon" style="background:${color}22">${catIcon(item.category)}</div>`;
     return `
       <div class="item-card" data-id="${item.id}" data-category="${item.category}">
-        <div class="item-icon" style="background:${color}22">${catIcon(item.category)}</div>
+        ${thumb}
         <div class="item-info">
           <div class="item-name">${esc(item.name)}</div>
           <div class="item-meta">${esc(meta)}</div>
@@ -277,6 +281,7 @@ async function analyzePhoto() {
     const res = await fetch('/upload', { method: 'POST', body: formData });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Analysis failed');
+    identifiedImageUrl = data.imageUrl || null;
     populateIdentifiedForm(data.identified);
   } catch (e) {
     errEl.textContent = e.message;
@@ -300,6 +305,7 @@ async function doSearch() {
 
   try {
     const data = await apiFetch(`/items/search?q=${encodeURIComponent(q)}`);
+    identifiedImageUrl = null;
     populateIdentifiedForm(data.details);
   } catch (e) {
     errEl.textContent = e.message || 'Search failed.';
@@ -332,6 +338,7 @@ function resetIdentifiedForm() {
   document.getElementById('camera-input').value = '';
   document.getElementById('search-input').value = '';
   selectedPhotoFile = null;
+  identifiedImageUrl = null;
 }
 
 async function saveIdentifiedItem() {
@@ -351,7 +358,8 @@ async function saveIdentifiedItem() {
     category: document.getElementById('f-category').value,
     color,
     size: document.getElementById('f-size').value.trim() || null,
-    brand: document.getElementById('f-brand').value.trim() || null
+    brand: document.getElementById('f-brand').value.trim() || null,
+    imageUrl: identifiedImageUrl || null
   };
 
   try {
