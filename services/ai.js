@@ -33,7 +33,8 @@ When given an image or text description of a clothing item, respond ONLY with va
   "category": "one of: tops | bottoms | shoes | outerwear | accessories",
   "color": "specific color (e.g. 'triple white', 'washed indigo', 'bone' — not just 'white' or 'blue')",
   "size": "exact size if visible or mentioned, otherwise null",
-  "brand": "exact official brand name if identifiable (e.g. 'Nike', 'Levi's', 'Zara'), otherwise null"
+  "brand": "exact official brand name if identifiable (e.g. 'Nike', 'Levi's', 'Zara'), otherwise null",
+  "material": "primary fabric or material (e.g. '100% cotton', 'full-grain leather', '4-way stretch nylon', 'heavyweight denim') or null if unknown"
 }
 No markdown, no explanation, no extra fields — JSON only.`,
   cache_control: { type: 'ephemeral' }
@@ -85,7 +86,7 @@ async function searchItemOnline(query) {
   // Step 1: Claude identifies product AND lists real color variants in one call
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 768,
+    max_tokens: 1500,
     messages: [{
       role: 'user',
       content: `You are an expert fashion product identifier.
@@ -93,13 +94,14 @@ async function searchItemOnline(query) {
 User description: "${query}"
 
 1. Resolve to the correct official product (fix typos, brand naming, etc.)
-2. List 5–6 real color variants that actually exist for this product.
+2. List ALL official colorways/color variants that exist for this product, sorted most common/popular first. Include every distinct colorway — do not truncate.
 
 Respond ONLY with valid JSON (no markdown):
 {
   "name": "official product name",
   "brand": "exact brand or null",
   "category": "tops|bottoms|shoes|outerwear|accessories",
+  "material": "primary fabric or material (e.g. '100% cotton', 'full-grain leather') or null",
   "size": null,
   "variants": [
     {"color": "color name exactly as sold", "searchQuery": "brand name color for Google image search"}
@@ -115,13 +117,17 @@ Respond ONLY with valid JSON (no markdown):
     name:     parsed.name,
     brand:    parsed.brand || null,
     category: parsed.category,
+    material: parsed.material || null,
     color:    parsed.variants?.[0]?.color || null,
     size:     parsed.size || null
   };
   const variants = parsed.variants || [];
 
-  // Step 2: Fetch one image per color variant — all in parallel
-  const variantsWithImages = await Promise.all(variants.map(async v => {
+  // Step 2: Fetch images for the first 10 variants in parallel; the rest get no image
+  const toFetch = variants.slice(0, 10);
+  const rest    = variants.slice(10);
+
+  const fetchedImages = await Promise.all(toFetch.map(async v => {
     let imageUrl = null;
     if (serpKey) {
       try {
@@ -138,6 +144,11 @@ Respond ONLY with valid JSON (no markdown):
     }
     return { color: v.color, imageUrl };
   }));
+
+  const variantsWithImages = [
+    ...fetchedImages,
+    ...rest.map(v => ({ color: v.color, imageUrl: null }))
+  ];
 
   // Step 3: Google Shopping for pricing / retailer info
   const q = [details.brand, details.name].filter(Boolean).join(' ');

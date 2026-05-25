@@ -194,11 +194,12 @@ function applySearch(items) {
   // Fuse.js fuzzy search — handles typos, partial words, multi-field
   const fuse = new Fuse(items, {
     keys: [
-      { name: 'name',     weight: 0.45 },
-      { name: 'brand',    weight: 0.25 },
-      { name: 'color',    weight: 0.15 },
-      { name: 'category', weight: 0.08 },
-      { name: 'tags',     weight: 0.07 }
+      { name: 'name',     weight: 0.40 },
+      { name: 'brand',    weight: 0.22 },
+      { name: 'color',    weight: 0.14 },
+      { name: 'material', weight: 0.12 },
+      { name: 'category', weight: 0.07 },
+      { name: 'tags',     weight: 0.05 }
     ],
     threshold: 0.4,
     ignoreLocation: true,
@@ -413,6 +414,7 @@ function enterEditMode() {
   document.getElementById('edit-color').value = item.color || '';
   document.getElementById('edit-size').value = item.size || '';
   document.getElementById('edit-brand').value = item.brand || '';
+  document.getElementById('edit-material').value = item.material || '';
   const catSelect = document.getElementById('edit-category');
   [...catSelect.options].forEach(o => { o.selected = o.value === item.category; });
 
@@ -507,6 +509,7 @@ async function saveItemEdits() {
     color,
     size: document.getElementById('edit-size').value.trim() || null,
     brand: document.getElementById('edit-brand').value.trim() || null,
+    material: document.getElementById('edit-material').value.trim() || null,
     tags,
     imageUrl: selectedImageUrl || null
   };
@@ -568,6 +571,7 @@ async function openItemDetail(id) {
     document.getElementById('detail-color').textContent = item.color || '—';
     document.getElementById('detail-size').textContent = item.size || '—';
     document.getElementById('detail-brand').textContent = item.brand || '—';
+    document.getElementById('detail-material').textContent = item.material || '—';
 
     const history = item.wearHistory || [];
     const wearEl = document.getElementById('detail-wear');
@@ -992,6 +996,7 @@ function populateIdentifiedForm(details) {
   document.getElementById('f-color').value = details.color || '';
   document.getElementById('f-size').value = details.size || '';
   document.getElementById('f-brand').value = details.brand || '';
+  document.getElementById('f-material').value = details.material || '';
   const catSelect = document.getElementById('f-category');
   if (details.category) {
     [...catSelect.options].forEach(o => { o.selected = o.value === details.category; });
@@ -1001,7 +1006,7 @@ function populateIdentifiedForm(details) {
 }
 
 function resetIdentifiedForm() {
-  ['f-name','f-color','f-size','f-brand'].forEach(id => { document.getElementById(id).value = ''; });
+  ['f-name','f-color','f-size','f-brand','f-material'].forEach(id => { document.getElementById(id).value = ''; });
   document.getElementById('f-category').selectedIndex = 0;
   document.getElementById('identified-form').classList.add('hidden');
   document.getElementById('image-preview-wrap').classList.add('hidden');
@@ -1034,6 +1039,7 @@ async function saveIdentifiedItem() {
     name, category: document.getElementById('f-category').value, color,
     size: document.getElementById('f-size').value.trim() || null,
     brand: document.getElementById('f-brand').value.trim() || null,
+    material: document.getElementById('f-material').value.trim() || null,
     imageUrl: identifiedImageUrl || null,
     tags
   };

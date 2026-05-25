@@ -95,11 +95,11 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /items — add a new clothing item
-// Body: { name, category, color, size, brand? }
+// Body: { name, category, color, size, brand?, material? }
 router.post('/', (req, res) => {
-  const { name, category, color, size, brand, imageUrl, tags } = req.body;
-  if (!name || !category || !color || !size) {
-    return res.status(400).json({ error: 'name, category, color, and size are required' });
+  const { name, category, color, size, brand, material, imageUrl, tags } = req.body;
+  if (!name || !category || !color) {
+    return res.status(400).json({ error: 'name, category, and color are required' });
   }
   const items = readItems();
   const newItem = {
@@ -107,8 +107,9 @@ router.post('/', (req, res) => {
     name,
     category,
     color,
-    size,
+    size: size || null,
     brand: brand || null,
+    material: material || null,
     imageUrl: imageUrl || null,
     tags: Array.isArray(tags) ? tags : [],
     wearCount: 0,
@@ -125,7 +126,7 @@ router.patch('/:id', (req, res) => {
   const items = readItems();
   const idx = items.findIndex(i => i.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Item not found' });
-  const allowed = ['name', 'category', 'color', 'size', 'brand', 'imageUrl', 'tags'];
+  const allowed = ['name', 'category', 'color', 'size', 'brand', 'material', 'imageUrl', 'tags'];
   allowed.forEach(field => {
     if (req.body[field] !== undefined) items[idx][field] = req.body[field];
   });
