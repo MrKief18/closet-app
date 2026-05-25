@@ -371,8 +371,9 @@ function setupItemDetail() {
 
   // View mode actions
   document.getElementById('btn-detail-wear').addEventListener('click', () => {
+    const id = detailItemId; // capture before closeItemDetail nulls it
     closeItemDetail();
-    wearItem(detailItemId);
+    wearItem(id);
   });
   document.getElementById('btn-detail-find-img').addEventListener('click', async () => {
     const btn = document.getElementById('btn-detail-find-img');
@@ -1020,35 +1021,15 @@ async function loadStats() {
   }
 }
 
+// ── Calendar state ────────────────────────────────────────────────────────────
+
+let _calWearLog = {};
+let _calYear  = new Date().getFullYear();
+let _calMonth = new Date().getMonth(); // 0-based
+
 function renderStats(d) {
   const cats = Object.entries(d.byCategory).sort((a, b) => b[1] - a[1]);
   const maxCat = cats[0]?.[1] || 1;
-  const wearLogEntries = Object.entries(d.wearLog || {});
-
-  const wearLogHtml = wearLogEntries.length ? `
-    <div class="stats-section">
-      <h3>Wear History</h3>
-      <div class="wear-log">
-        ${wearLogEntries.map(([date, items]) => {
-          const d = new Date(date + 'T12:00:00');
-          const label = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-          return `
-            <div class="wear-log-day">
-              <div class="wear-log-date">${esc(label)}</div>
-              <div class="wear-log-items">
-                ${items.map(it => `
-                  <div class="wear-log-item">
-                    ${it.imageUrl
-                      ? `<img src="${esc(it.imageUrl)}" class="wear-log-thumb" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-                      : ''}
-                    <div class="wear-log-icon" style="${it.imageUrl ? 'display:none' : ''}">${catIcon(it.category)}</div>
-                    <span class="wear-log-name">${esc(it.name)}</span>
-                  </div>`).join('')}
-              </div>
-            </div>`;
-        }).join('')}
-      </div>
-    </div>` : '';
 
   document.getElementById('stats-content').innerHTML = `
     <div class="stat-cards">
@@ -1078,7 +1059,90 @@ function renderStats(d) {
             </div>`).join('')}
         </div>` : ''}
     </div>
-    ${wearLogHtml}`;
+    <div class="stats-section">
+      <h3>Wear Calendar</h3>
+      <div id="wear-calendar"></div>
+      <div id="calendar-day-detail" class="calendar-day-detail hidden"></div>
+    </div>`;
+
+  // Initialise calendar
+  _calWearLog = d.wearLog || {};
+  _calYear  = new Date().getFullYear();
+  _calMonth = new Date().getMonth();
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const today = new Date().toISOString().slice(0,10);
+  const firstDay = new Date(_calYear, _calMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(_calYear, _calMonth + 1, 0).getDate();
+  const monthLabel = new Date(_calYear, _calMonth, 1)
+    .toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+  let cells = '';
+  // Blank cells before the 1st
+  for (let i = 0; i < firstDay; i++) cells += `<div class="cal-cell cal-blank"></div>`;
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${_calYear}-${String(_calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const hasWear = !!_calWearLog[dateStr];
+    const isToday = dateStr === today;
+    cells += `<div class="cal-cell${hasWear ? ' cal-has-wear' : ''}${isToday ? ' cal-today' : ''}"
+      data-date="${dateStr}" role="button" tabindex="${hasWear ? 0 : -1}">
+      <span class="cal-day-num">${day}</span>
+      ${hasWear ? `<span class="cal-dot"></span>` : ''}
+    </div>`;
+  }
+
+  document.getElementById('wear-calendar').innerHTML = `
+    <div class="cal-header">
+      <button class="cal-nav" id="cal-prev">‹</button>
+      <span class="cal-month-label">${esc(monthLabel)}</span>
+      <button class="cal-nav" id="cal-next">›</button>
+    </div>
+    <div class="cal-grid">
+      ${DAYS.map(d => `<div class="cal-weekday">${d}</div>`).join('')}
+      ${cells}
+    </div>`;
+
+  document.getElementById('cal-prev').addEventListener('click', () => {
+    if (_calMonth === 0) { _calMonth = 11; _calYear--; } else _calMonth--;
+    renderCalendar();
+    document.getElementById('calendar-day-detail').classList.add('hidden');
+  });
+  document.getElementById('cal-next').addEventListener('click', () => {
+    if (_calMonth === 11) { _calMonth = 0; _calYear++; } else _calMonth++;
+    renderCalendar();
+    document.getElementById('calendar-day-detail').classList.add('hidden');
+  });
+
+  document.querySelectorAll('.cal-cell.cal-has-wear').forEach(cell => {
+    cell.addEventListener('click', () => showCalendarDay(cell.dataset.date));
+  });
+}
+
+function showCalendarDay(dateStr) {
+  // Highlight selected
+  document.querySelectorAll('.cal-cell').forEach(c => c.classList.toggle('cal-selected', c.dataset.date === dateStr));
+
+  const items = _calWearLog[dateStr] || [];
+  const d = new Date(dateStr + 'T12:00:00');
+  const label = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  const el = document.getElementById('calendar-day-detail');
+  el.innerHTML = `
+    <div class="cal-detail-date">${esc(label)}</div>
+    <div class="wear-log-items">
+      ${items.map(it => `
+        <div class="wear-log-item">
+          ${it.imageUrl
+            ? `<img src="${esc(it.imageUrl)}" class="wear-log-thumb" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+            : ''}
+          <div class="wear-log-icon" style="${it.imageUrl ? 'display:none' : ''}">${catIcon(it.category)}</div>
+          <span class="wear-log-name">${esc(it.name)}</span>
+        </div>`).join('')}
+    </div>`;
+  el.classList.remove('hidden');
 }
 
 // ── Suggest Outfit Modal ──────────────────────────────────────────────────────
