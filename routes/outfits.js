@@ -134,6 +134,7 @@ router.post('/:id/wear', (req, res) => {
   const items = readItems();
   const now = new Date();
   const localDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const weather = req.body?.weather || null;
 
   let wornCount = 0;
   for (const id of outfit.itemIds) {
@@ -142,7 +143,7 @@ router.post('/:id/wear', (req, res) => {
     items[idx].wearCount = (items[idx].wearCount || 0) + 1;
     items[idx].lastWorn = now.toISOString();
     if (!Array.isArray(items[idx].wearHistory)) items[idx].wearHistory = [];
-    items[idx].wearHistory.push(localDate);
+    items[idx].wearHistory.push({ date: localDate, weather });
     if (items[idx].category !== 'shoes') items[idx].isDirty = true;
     wornCount++;
   }
@@ -150,7 +151,7 @@ router.post('/:id/wear', (req, res) => {
 
   // Record the outfit wear event with full timestamp for calendar display
   if (!Array.isArray(outfit.wearEvents)) outfit.wearEvents = [];
-  outfit.wearEvents.push({ timestamp: now.toISOString(), date: localDate, itemIds: [...outfit.itemIds] });
+  outfit.wearEvents.push({ timestamp: now.toISOString(), date: localDate, itemIds: [...outfit.itemIds], weather });
   writeOutfits(outfits);
 
   res.json({ wornCount });

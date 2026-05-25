@@ -26,6 +26,7 @@ let detailItemId = null;
 let detailOutfitId = null;
 let _pendingRatingId  = null; // outfit ID waiting for a post-wear star rating
 let _outfitEditItems  = new Set(); // selected item IDs during outfit edit mode
+let _currentWeather   = null; // { temp, condition, unit } — set when weather widget loads
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
@@ -412,7 +413,7 @@ async function deleteItem(id) {
 
 async function wearItem(id) {
   try {
-    await apiFetch(`/items/${id}/wear`, { method: 'POST' });
+    await apiFetch(`/items/${id}/wear`, { method: 'POST', body: JSON.stringify({ weather: _currentWeather }) });
     showToast('Logged as worn today!');
     loadCloset();
   } catch {
@@ -705,17 +706,22 @@ async function openItemDetail(id) {
     if (!history.length) {
       wearEl.textContent = 'Never worn';
     } else {
-      const latest = new Date(history[history.length - 1] + 'T12:00:00').toLocaleDateString();
-      wearEl.innerHTML = `${history.length}× &nbsp;<span class="wear-history-toggle" id="wear-toggle-btn">Last: ${esc(latest)} ▾</span>`;
+      // entries may be plain strings (legacy) or { date, weather } objects
+      const getDate    = e => typeof e === 'string' ? e : e.date;
+      const getWeather = e => typeof e === 'string' ? null : e.weather;
+      const latestDate = new Date(getDate(history[history.length - 1]) + 'T12:00:00').toLocaleDateString();
+      wearEl.innerHTML = `${history.length}× &nbsp;<span class="wear-history-toggle" id="wear-toggle-btn">Last: ${esc(latestDate)} ▾</span>`;
       document.getElementById('wear-toggle-btn').addEventListener('click', () => {
         const existing = document.getElementById('wear-history-list');
         if (existing) { existing.remove(); return; }
         const list = document.createElement('div');
         list.id = 'wear-history-list';
         list.className = 'wear-history-list';
-        list.innerHTML = [...history].reverse().map(date => {
-          const d = new Date(date + 'T12:00:00');
-          return `<div class="wear-history-date">${d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</div>`;
+        list.innerHTML = [...history].reverse().map(entry => {
+          const d = new Date(getDate(entry) + 'T12:00:00');
+          const w = getWeather(entry);
+          const weatherStr = w ? `<span class="wear-weather">${CONDITION_ICON[w.condition] || '🌤️'} ${w.temp}°${w.unit}</span>` : '';
+          return `<div class="wear-history-date">${d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}${weatherStr}</div>`;
         }).join('');
         wearEl.after(list);
       });
@@ -818,7 +824,7 @@ async function deleteOutfit(id) {
 async function wearOutfit(id, btn) {
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
   try {
-    const { wornCount } = await apiFetch(`/outfits/${id}/wear`, { method: 'POST' });
+    const { wornCount } = await apiFetch(`/outfits/${id}/wear`, { method: 'POST', body: JSON.stringify({ weather: _currentWeather }) });
     showToast(`Logged ${wornCount} item${wornCount !== 1 ? 's' : ''} as worn today!`);
     loadOutfits();
     // Prompt for a rating — skip button dismisses, rating is optional
@@ -1642,7 +1648,7 @@ function showCalendarDay(dateStr) {
       let count = 0;
       for (const id of wornIds) {
         try {
-          await apiFetch(`/items/${id}/wear`, { method: 'POST' });
+          await apiFetch(`/items/${id}/wear`, { method: 'POST', body: JSON.stringify({ weather: _currentWeather }) });
           count++;
         } catch {}
       }
@@ -1840,6 +1846,7 @@ async function _loadWeather(lat, lon) {
     for (const [name, codes] of Object.entries(WEATHER_CODE_MAP)) {
       if (codes.includes(code)) { condition = name; break; }
     }
+    _currentWeather = { temp, condition, unit: 'F' };
     document.getElementById('weather-icon').textContent = CONDITION_ICON[condition] || '🌤️';
     document.getElementById('weather-desc').textContent =
       `${temp}°F · ${condition.charAt(0).toUpperCase() + condition.slice(1)}`;
@@ -2144,7 +2151,7 @@ async function handleDressLog() {
   if (!ids.length) { showToast('Build an outfit first!', true); return; }
   let count = 0;
   for (const id of ids) {
-    try { await apiFetch(`/items/${id}/wear`, { method: 'POST' }); count++; } catch {}
+    try { await apiFetch(`/items/${id}/wear`, { method: 'POST', body: JSON.stringify({ weather: _currentWeather }) }); count++; } catch {}
   }
   showToast(`Logged ${count} item${count !== 1 ? 's' : ''} as worn!`);
 }

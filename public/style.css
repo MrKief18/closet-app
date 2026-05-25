@@ -660,7 +660,8 @@ header {
 .wear-log-name { font-size: 12px; color: var(--color-text-primary); max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wear-history-toggle { font-size: 11px; color: var(--color-accent); cursor: pointer; user-select: none; }
 .wear-history-list { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; max-height: 180px; overflow-y: auto; }
-.wear-history-date { font-size: 12px; color: var(--color-text-secondary); padding: 4px 10px; background: var(--color-surface-raised); border-radius: var(--r-sm); }
+.wear-history-date { font-size: 12px; color: var(--color-text-secondary); padding: 4px 10px; background: var(--color-surface-raised); border-radius: var(--r-sm); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wear-weather { font-size: 11px; color: var(--color-text-muted); white-space: nowrap; }
 
 /* ── Gap Analysis ── */
 .gap-score-row { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }

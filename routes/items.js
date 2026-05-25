@@ -162,8 +162,9 @@ router.post('/:id/wear', (req, res) => {
   items[idx].lastWorn = now.toISOString();
   if (!Array.isArray(items[idx].wearHistory)) items[idx].wearHistory = [];
   const localDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  items[idx].wearHistory.push(localDate);
-  items[idx].isDirty = true; // Feature 1: wearing an item makes it dirty
+  const weather = req.body?.weather || null;
+  items[idx].wearHistory.push({ date: localDate, weather });
+  items[idx].isDirty = true;
   writeItems(items);
   res.json(items[idx]);
 });
