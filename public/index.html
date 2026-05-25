@@ -231,13 +231,35 @@
   <div id="outfit-detail-modal" class="modal-overlay hidden">
     <div class="modal outfit-detail-modal">
       <button class="btn-close-modal" id="btn-close-outfit-detail">×</button>
-      <h2 id="outfit-detail-name"></h2>
-      <div id="outfit-detail-grid" class="outfit-detail-grid"></div>
-      <div id="outfit-detail-chips" class="outfit-detail-chips"></div>
-      <div class="modal-actions">
-        <button id="btn-outfit-detail-wear" class="btn-primary">✓ Log Wear</button>
-        <button id="btn-outfit-detail-delete" class="btn-secondary btn-danger">Delete Outfit</button>
-        <button id="btn-close-outfit-detail2" class="btn-secondary">Close</button>
+
+      <!-- View mode -->
+      <div id="outfit-detail-view">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px">
+          <h2 id="outfit-detail-name" style="margin-bottom:0"></h2>
+          <button id="btn-outfit-detail-edit" class="btn-edit-toggle">Edit</button>
+        </div>
+        <div id="outfit-detail-grid" class="outfit-detail-grid"></div>
+        <div id="outfit-detail-chips" class="outfit-detail-chips"></div>
+        <div class="modal-actions">
+          <button id="btn-outfit-detail-wear" class="btn-primary">✓ Log Wear</button>
+          <button id="btn-outfit-detail-delete" class="btn-secondary btn-danger">Delete Outfit</button>
+          <button id="btn-close-outfit-detail2" class="btn-secondary">Close</button>
+        </div>
+      </div>
+
+      <!-- Edit mode -->
+      <div id="outfit-detail-edit" class="hidden">
+        <h2 style="margin-bottom:16px">Edit Outfit</h2>
+        <label class="detail-edit-label">Outfit Name
+          <input type="text" id="outfit-edit-name" class="detail-edit-input" style="margin-top:6px;width:100%">
+        </label>
+        <p class="modal-sub" style="margin-top:18px">Tap items to add or remove — selected items are highlighted:</p>
+        <div id="outfit-edit-picker" class="items-grid selectable outfit-edit-picker"></div>
+        <div id="outfit-edit-error" class="error-msg hidden"></div>
+        <div class="modal-actions">
+          <button id="btn-outfit-edit-save" class="btn-primary">Save Changes</button>
+          <button id="btn-outfit-edit-cancel" class="btn-secondary">Cancel</button>
+        </div>
       </div>
     </div>
   </div>

@@ -1115,6 +1115,14 @@ main { padding: 28px; max-width: 1040px; margin: 0 auto; }
   padding-top: 14px;
 }
 
+/* ── Outfit Edit Picker ── */
+.outfit-edit-picker {
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  margin: 8px 0 16px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
 /* ── Utilities ── */
 .hidden { display: none !important; }
 

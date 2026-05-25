@@ -24,7 +24,8 @@ let suggestOccasion = '';
 let suggestResult = null;
 let detailItemId = null;
 let detailOutfitId = null;
-let _pendingRatingId = null; // outfit ID waiting for a post-wear star rating
+let _pendingRatingId  = null; // outfit ID waiting for a post-wear star rating
+let _outfitEditItems  = new Set(); // selected item IDs during outfit edit mode
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
@@ -816,6 +817,7 @@ async function wearOutfit(id, btn) {
 function setupOutfitDetail() {
   const close = () => {
     document.getElementById('outfit-detail-modal').classList.add('hidden');
+    exitOutfitEditMode();
     detailOutfitId = null;
   };
   document.getElementById('btn-close-outfit-detail').addEventListener('click', close);
@@ -832,6 +834,9 @@ function setupOutfitDetail() {
     close();
     deleteOutfit(detailOutfitId);
   });
+  document.getElementById('btn-outfit-detail-edit').addEventListener('click', enterOutfitEditMode);
+  document.getElementById('btn-outfit-edit-cancel').addEventListener('click', exitOutfitEditMode);
+  document.getElementById('btn-outfit-edit-save').addEventListener('click', saveOutfitEdits);
 }
 
 // ── Post-wear Rating Sheet ────────────────────────────────────────────────────
@@ -893,6 +898,7 @@ async function openOutfitDetail(id) {
     const outfits = await apiFetch('/outfits');
     const outfit = outfits.find(o => o.id === id);
     if (!outfit) return;
+    window._detailOutfit = outfit;
 
     document.getElementById('outfit-detail-name').textContent = outfit.name;
     document.getElementById('btn-outfit-detail-delete').dataset.id = id;
@@ -919,6 +925,117 @@ async function openOutfitDetail(id) {
     document.getElementById('outfit-detail-modal').classList.remove('hidden');
   } catch {
     showToast('Failed to load outfit', true);
+  }
+}
+
+// ── Outfit Edit Mode ──────────────────────────────────────────────────────────
+
+async function enterOutfitEditMode() {
+  const outfit = window._detailOutfit;
+  if (!outfit) return;
+
+  _outfitEditItems = new Set(outfit.itemIds || []);
+  document.getElementById('outfit-edit-name').value = outfit.name || '';
+  document.getElementById('outfit-edit-error').classList.add('hidden');
+  document.getElementById('outfit-detail-view').classList.add('hidden');
+  document.getElementById('outfit-detail-edit').classList.remove('hidden');
+
+  const picker = document.getElementById('outfit-edit-picker');
+  picker.innerHTML = '<p class="loading" style="grid-column:1/-1;padding:24px 0">Loading items…</p>';
+  try {
+    const items = await apiFetch('/items');
+    renderOutfitEditPicker(items);
+  } catch {
+    picker.innerHTML = '<p class="error-msg" style="grid-column:1/-1">Could not load items.</p>';
+  }
+}
+
+function renderOutfitEditPicker(items) {
+  const picker = document.getElementById('outfit-edit-picker');
+  if (!items.length) {
+    picker.innerHTML = '<p class="empty-state" style="grid-column:1/-1">No items in your closet.</p>';
+    return;
+  }
+  picker.innerHTML = items.map(item => {
+    const color = catColor(item.category);
+    const meta  = [item.color, item.brand].filter(Boolean).join(' · ');
+    const sel   = _outfitEditItems.has(item.id);
+    if (item.imageUrl) {
+      return `
+        <div class="item-card has-image${sel ? ' selected' : ''}" data-id="${item.id}" data-category="${item.category}">
+          <img class="item-img" src="${esc(item.imageUrl)}" alt="${esc(item.name)}">
+          <div class="item-overlay">
+            <div class="item-name">${esc(item.name)}</div>
+            <div class="item-meta">${esc(meta)}</div>
+          </div>
+        </div>`;
+    } else {
+      return `
+        <div class="item-card${sel ? ' selected' : ''}" data-id="${item.id}" data-category="${item.category}">
+          <div class="item-icon" style="background:${color}18">${catIcon(item.category)}</div>
+          <div class="item-info">
+            <div class="item-name">${esc(item.name)}</div>
+            <div class="item-meta">${esc(meta)}</div>
+            <span class="item-cat-badge" style="background:${color}18;color:${color}">${item.category}</span>
+          </div>
+        </div>`;
+    }
+  }).join('');
+
+  picker.querySelectorAll('.item-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const id = card.dataset.id;
+      if (_outfitEditItems.has(id)) {
+        _outfitEditItems.delete(id);
+        card.classList.remove('selected');
+      } else {
+        _outfitEditItems.add(id);
+        card.classList.add('selected');
+      }
+    });
+  });
+}
+
+function exitOutfitEditMode() {
+  document.getElementById('outfit-detail-edit').classList.add('hidden');
+  document.getElementById('outfit-detail-view').classList.remove('hidden');
+}
+
+async function saveOutfitEdits() {
+  const name  = document.getElementById('outfit-edit-name').value.trim();
+  const errEl = document.getElementById('outfit-edit-error');
+  errEl.classList.add('hidden');
+
+  if (!name) {
+    errEl.textContent = 'Please enter an outfit name.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (_outfitEditItems.size === 0) {
+    errEl.textContent = 'Select at least one item.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const saveBtn = document.getElementById('btn-outfit-edit-save');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+
+  try {
+    await apiFetch(`/outfits/${detailOutfitId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name, itemIds: [..._outfitEditItems] })
+    });
+    showToast('Outfit updated!');
+    document.getElementById('outfit-detail-modal').classList.add('hidden');
+    exitOutfitEditMode();
+    detailOutfitId = null;
+    loadOutfits();
+  } catch (e) {
+    errEl.textContent = e.message || 'Failed to save.';
+    errEl.classList.remove('hidden');
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Changes';
   }
 }
 
