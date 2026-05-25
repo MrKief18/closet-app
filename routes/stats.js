@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const { readJSON } = require('../services/db');
+const { analyzeWardrobeGaps } = require('../services/ai');
 
 const router = express.Router();
 const CLOSET_PATH = path.join(__dirname, '../data/closet.json');
@@ -43,6 +44,19 @@ router.get('/', (req, res) => {
   );
 
   res.json({ totalItems: items.length, totalOutfits: outfits.length, byCategory, byColor, neverWorn, wornThisMonth, mostWorn, wearLog });
+});
+
+// GET /stats/gaps — AI-powered wardrobe gap analysis
+router.get('/gaps', async (req, res) => {
+  const items = readJSON(CLOSET_PATH);
+  // Require at least 5 items for a meaningful analysis
+  if (items.length < 5) return res.json({ gaps: null, message: 'Add more items for a gap analysis' });
+  try {
+    const analysis = await analyzeWardrobeGaps(items);
+    res.json(analysis);
+  } catch (err) {
+    res.status(500).json({ error: 'Analysis failed', detail: err.message });
+  }
 });
 
 module.exports = router;

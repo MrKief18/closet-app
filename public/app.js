@@ -24,6 +24,7 @@ let suggestOccasion = '';
 let suggestResult = null;
 let detailItemId = null;
 let detailOutfitId = null;
+let _pendingRatingId = null; // outfit ID waiting for a post-wear star rating
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSuggestModal();
   setupItemDetail();
   setupOutfitDetail();
+  setupRatingSheet();
   loadCloset();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
 });
@@ -43,13 +45,21 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Navigation ────────────────────────────────────────────────────────────────
 
 function setupNav() {
+  // Wire up top nav tabs
   document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => switchView(tab.dataset.view));
+  });
+  // Wire up mobile bottom nav buttons
+  document.querySelectorAll('.bottom-nav-item').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.dataset.view));
   });
 }
 
 function switchView(view) {
+  // Sync top nav tabs
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+  // Sync bottom nav items (mobile)
+  document.querySelectorAll('.bottom-nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === `view-${view}`));
   if (view === 'closet') loadCloset();
   if (view === 'outfits') loadOutfits();
@@ -235,6 +245,20 @@ function setupFilters() {
 
 async function loadCloset() {
   if (aiSearchActive) return; // AI search result is already rendered
+
+  // Feature 3: archived view fetches all items and filters to archived only
+  if (currentFilter === 'archived') {
+    try {
+      let items = await apiFetch('/items?includeArchived=true');
+      items = items.filter(i => i.isArchived);
+      items = applySearch(applySort(items));
+      renderItemGrid('items-grid', items, false);
+    } catch {
+      document.getElementById('items-grid').innerHTML = '<p class="empty-state">Failed to load closet.</p>';
+    }
+    return;
+  }
+
   const params = [];
   if (currentFilter) params.push(`category=${encodeURIComponent(currentFilter)}`);
   if (currentTagFilter) params.push(`tag=${encodeURIComponent(currentTagFilter)}`);
@@ -242,6 +266,31 @@ async function loadCloset() {
   try {
     let items = await apiFetch(url);
     items = applySearch(applySort(items));
+
+    // Show full empty state when closet is truly empty (no filter/search active)
+    if (!items.length && !currentFilter && !currentTagFilter && !currentSearch) {
+      document.getElementById('items-grid').innerHTML = `
+        <div class="empty-state-full">
+          <div class="empty-state-emoji">👕</div>
+          <h2 class="empty-state-title">Your closet is empty</h2>
+          <p class="empty-state-desc">Add your first item by taking a photo or describing it — Claude will identify the brand, color, and category automatically.</p>
+          <div class="empty-state-actions">
+            <button class="btn-primary empty-cta" data-action="camera">📷 Take a Photo</button>
+            <button class="btn-secondary empty-cta" data-action="search">🔍 Search an Item</button>
+          </div>
+        </div>`;
+      // Wire up CTA buttons
+      document.querySelector('.empty-cta[data-action="camera"]').addEventListener('click', () => {
+        switchView('add');
+        document.getElementById('btn-show-camera').click();
+      });
+      document.querySelector('.empty-cta[data-action="search"]').addEventListener('click', () => {
+        switchView('add');
+        document.getElementById('btn-show-search').click();
+      });
+      return;
+    }
+
     renderItemGrid('items-grid', items, false);
   } catch {
     document.getElementById('items-grid').innerHTML = '<p class="empty-state">Failed to load closet.</p>';
@@ -262,10 +311,15 @@ function renderItemGrid(containerId, items, selectable) {
     const actionBtns = selectable ? '' : `
       <button class="btn-wear" data-id="${item.id}" title="Log as worn today">✓</button>
       <button class="btn-delete" data-id="${item.id}" title="Remove">×</button>`;
+    // Feature 1: dirty badge overlay and dim class
+    const dirtyClass = item.isDirty ? ' item-dirty' : '';
+    const dirtyBadge = item.isDirty ? `<div class="item-dirty-badge" title="Needs washing">🧺</div>` : '';
+    // Feature 3: archived dim class
+    const archivedClass = item.isArchived ? ' item-archived' : '';
 
     if (item.imageUrl) {
       return `
-        <div class="item-card has-image" data-id="${item.id}" data-category="${item.category}">
+        <div class="item-card has-image${dirtyClass}${archivedClass}" data-id="${item.id}" data-category="${item.category}">
           <img class="item-img" src="${esc(item.imageUrl)}" alt="${esc(item.name)}">
           <div class="item-overlay">
             <div class="item-name">${esc(item.name)}</div>
@@ -274,11 +328,12 @@ function renderItemGrid(containerId, items, selectable) {
             ${tags ? `<div class="item-tags">${tags}</div>` : ''}
             ${wearInfo}
           </div>
+          ${dirtyBadge}
           ${actionBtns}
         </div>`;
     } else {
       return `
-        <div class="item-card" data-id="${item.id}" data-category="${item.category}">
+        <div class="item-card${dirtyClass}${archivedClass}" data-id="${item.id}" data-category="${item.category}">
           <div class="item-icon" style="background:${color}18">${catIcon(item.category)}</div>
           <div class="item-info">
             <div class="item-name">${esc(item.name)}</div>
@@ -288,6 +343,7 @@ function renderItemGrid(containerId, items, selectable) {
             ${wearInfo}
             ${selectable ? '' : `<button class="btn-find-img" data-id="${item.id}">🔍 Find Image</button>`}
           </div>
+          ${dirtyBadge}
           ${actionBtns}
         </div>`;
     }
@@ -376,6 +432,35 @@ function setupItemDetail() {
     closeItemDetail();
     wearItem(id);
   });
+
+  // Feature 1: Mark Clean button — resets dirty flag and refreshes
+  document.getElementById('btn-detail-clean').addEventListener('click', async () => {
+    try {
+      await apiFetch(`/items/${detailItemId}/clean`, { method: 'POST' });
+      showToast('Marked as clean!');
+      closeItemDetail();
+      loadCloset();
+    } catch {
+      showToast('Failed to update item', true);
+    }
+  });
+
+  // Feature 3: Archive / Unarchive button — toggles seasonal storage state
+  document.getElementById('btn-detail-archive').addEventListener('click', async () => {
+    const item = window._detailItem;
+    if (!item) return;
+    const endpoint = item.isArchived ? 'unarchive' : 'archive';
+    const toastMsg = item.isArchived ? 'Back in closet!' : 'Moved to storage';
+    try {
+      await apiFetch(`/items/${detailItemId}/${endpoint}`, { method: 'POST' });
+      showToast(toastMsg);
+      closeItemDetail();
+      loadCloset();
+    } catch {
+      showToast('Failed to update item', true);
+    }
+  });
+
   document.getElementById('btn-detail-find-img').addEventListener('click', async () => {
     const btn = document.getElementById('btn-detail-find-img');
     btn.disabled = true;
@@ -415,6 +500,7 @@ function enterEditMode() {
   document.getElementById('edit-size').value = item.size || '';
   document.getElementById('edit-brand').value = item.brand || '';
   document.getElementById('edit-material').value = item.material || '';
+  document.getElementById('edit-price').value = item.purchasePrice || ''; // Feature 2: price paid
   const catSelect = document.getElementById('edit-category');
   [...catSelect.options].forEach(o => { o.selected = o.value === item.category; });
 
@@ -511,7 +597,8 @@ async function saveItemEdits() {
     brand: document.getElementById('edit-brand').value.trim() || null,
     material: document.getElementById('edit-material').value.trim() || null,
     tags,
-    imageUrl: selectedImageUrl || null
+    imageUrl: selectedImageUrl || null,
+    purchasePrice: parseFloat(document.getElementById('edit-price').value) || null // Feature 2: cost-per-wear
   };
 
   const saveBtn = document.getElementById('btn-detail-save');
@@ -562,6 +649,12 @@ async function openItemDetail(id) {
     findBtn.disabled = false;
     findBtn.textContent = '🔍 Find Image';
 
+    // Feature 1: show "Mark Clean" button only when item is dirty
+    document.getElementById('btn-detail-clean').classList.toggle('hidden', !item.isDirty);
+
+    // Feature 3: update archive button text based on current archived state
+    document.getElementById('btn-detail-archive').textContent = item.isArchived ? '📤 Bring Back' : '📦 Store Away';
+
     document.getElementById('detail-name').textContent = item.name;
     const badge = document.getElementById('detail-cat-badge');
     badge.textContent = item.category;
@@ -572,6 +665,16 @@ async function openItemDetail(id) {
     document.getElementById('detail-size').textContent = item.size || '—';
     document.getElementById('detail-brand').textContent = item.brand || '—';
     document.getElementById('detail-material').textContent = item.material || '—';
+
+    // Feature 2: compute and display cost-per-wear in the Value meta field
+    const cpwEl = document.getElementById('detail-cpw');
+    if (item.purchasePrice && item.wearCount > 0) {
+      cpwEl.textContent = `$${(item.purchasePrice / item.wearCount).toFixed(2)} / wear`;
+    } else if (item.purchasePrice) {
+      cpwEl.textContent = 'never worn yet';
+    } else {
+      cpwEl.textContent = '—';
+    }
 
     const history = item.wearHistory || [];
     const wearEl = document.getElementById('detail-wear');
@@ -615,7 +718,19 @@ async function loadOutfits() {
     const outfits = await apiFetch('/outfits');
     const list = document.getElementById('outfits-list');
     if (!outfits.length) {
-      list.innerHTML = '<p class="empty-state"><span class="empty-state-icon">👔</span>No outfits saved yet — build one!</p>';
+      list.innerHTML = `
+        <div class="empty-state-full">
+          <div class="empty-state-emoji">👔</div>
+          <h2 class="empty-state-title">No outfits yet</h2>
+          <p class="empty-state-desc">Build your first outfit by picking items from your closet, or let AI suggest one based on the occasion.</p>
+          <div class="empty-state-actions">
+            <button class="btn-primary empty-cta" id="es-btn-new-outfit">+ Build Outfit</button>
+            <button class="btn-secondary empty-cta" id="es-btn-suggest">✨ AI Suggest</button>
+          </div>
+        </div>`;
+      // Wire up CTA buttons to the existing header buttons
+      document.getElementById('es-btn-new-outfit').addEventListener('click', () => document.getElementById('btn-new-outfit').click());
+      document.getElementById('es-btn-suggest').addEventListener('click', () => document.getElementById('btn-new-suggest').click());
       return;
     }
     list.innerHTML = outfits.map(o => {
@@ -625,12 +740,18 @@ async function loadOutfits() {
           : `<div class="outfit-strip-icon" style="background:${catColor(i.category)}18">${catIcon(i.category)}</div>`
       ).join('');
 
+      // Show average star rating if any ratings have been submitted
+      const avgBadge = o.avgRating
+        ? `<span class="outfit-avg-rating" title="${o.avgRating} avg rating">${'★'.repeat(Math.round(o.avgRating))} ${o.avgRating}</span>`
+        : '';
+
       return `
         <div class="outfit-card" data-id="${o.id}">
           <div class="outfit-image-strip">${strip || '<div class="outfit-strip-icon" style="background:var(--surface2);flex:1">👔</div>'}</div>
           <div class="outfit-card-body">
             <span class="outfit-name">${esc(o.name)}</span>
             <span class="outfit-item-count">${(o.items || []).length} items</span>
+            ${avgBadge}
             <div class="outfit-card-actions">
               <button class="btn-wear-outfit" data-id="${o.id}" title="Log all items as worn today">✓ Wore This</button>
               <button class="btn-delete-outfit" data-id="${o.id}" title="Delete">×</button>
@@ -672,6 +793,8 @@ async function wearOutfit(id, btn) {
     const { wornCount } = await apiFetch(`/outfits/${id}/wear`, { method: 'POST' });
     showToast(`Logged ${wornCount} item${wornCount !== 1 ? 's' : ''} as worn today!`);
     loadOutfits();
+    // Prompt for a rating — skip button dismisses, rating is optional
+    showRatingSheet(id);
   } catch {
     showToast('Failed to log wear', true);
     if (btn) { btn.disabled = false; btn.textContent = '✓ Wore This'; }
@@ -997,6 +1120,7 @@ function populateIdentifiedForm(details) {
   document.getElementById('f-size').value = details.size || '';
   document.getElementById('f-brand').value = details.brand || '';
   document.getElementById('f-material').value = details.material || '';
+  document.getElementById('f-price').value = ''; // Feature 2: price always blank on AI fill — user enters manually
   const catSelect = document.getElementById('f-category');
   if (details.category) {
     [...catSelect.options].forEach(o => { o.selected = o.value === details.category; });
@@ -1006,7 +1130,7 @@ function populateIdentifiedForm(details) {
 }
 
 function resetIdentifiedForm() {
-  ['f-name','f-color','f-size','f-brand','f-material'].forEach(id => { document.getElementById(id).value = ''; });
+  ['f-name','f-color','f-size','f-brand','f-material','f-price'].forEach(id => { document.getElementById(id).value = ''; }); // f-price: Feature 2
   document.getElementById('f-category').selectedIndex = 0;
   document.getElementById('identified-form').classList.add('hidden');
   document.getElementById('image-preview-wrap').classList.add('hidden');
@@ -1041,7 +1165,8 @@ async function saveIdentifiedItem() {
     brand: document.getElementById('f-brand').value.trim() || null,
     material: document.getElementById('f-material').value.trim() || null,
     imageUrl: identifiedImageUrl || null,
-    tags
+    tags,
+    purchasePrice: parseFloat(document.getElementById('f-price').value) || null // Feature 2: cost-per-wear
   };
 
   try {
@@ -1078,6 +1203,24 @@ let _calYear  = new Date().getFullYear();
 let _calMonth = new Date().getMonth(); // 0-based
 
 function renderStats(d) {
+  // Show full empty state when there are no items yet
+  if (!d.totalItems) {
+    document.getElementById('stats-content').innerHTML = `
+      <div class="empty-state-full">
+        <div class="empty-state-emoji">📊</div>
+        <h2 class="empty-state-title">No data yet</h2>
+        <p class="empty-state-desc">Add items to your closet and log what you wear — your stats, wear calendar, and insights will appear here.</p>
+        <div class="empty-state-actions">
+          <button class="btn-primary empty-cta" data-action="camera">Start Adding Items</button>
+        </div>
+      </div>`;
+    document.querySelector('#stats-content .empty-cta[data-action="camera"]').addEventListener('click', () => {
+      switchView('add');
+      document.getElementById('btn-show-camera').click();
+    });
+    return;
+  }
+
   const cats = Object.entries(d.byCategory).sort((a, b) => b[1] - a[1]);
   const maxCat = cats[0]?.[1] || 1;
 

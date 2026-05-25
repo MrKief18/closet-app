@@ -5,6 +5,7 @@ const itemsRouter = require('./routes/items');
 const outfitsRouter = require('./routes/outfits');
 const uploadRouter = require('./routes/upload');
 const statsRouter = require('./routes/stats');
+const weatherRouter = require('./routes/weather');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -26,6 +27,9 @@ app.use('/upload', uploadRouter);
 
 // Mount wardrobe analytics route
 app.use('/stats', statsRouter);
+
+// Mount weather-aware outfit suggestion route
+app.use('/weather', weatherRouter);
 
 
 app.listen(PORT, () => {

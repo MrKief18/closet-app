@@ -17,10 +17,16 @@ function populateItems(itemIds) {
   return itemIds.map(id => allItems.find(i => i.id === id) || { id, error: 'item not found' });
 }
 
-// GET /outfits — list all outfits with populated items
+// GET /outfits — list all outfits with populated items and average rating
 router.get('/', (req, res) => {
   const outfits = readOutfits();
-  const populated = outfits.map(o => ({ ...o, items: populateItems(o.itemIds) }));
+  const populated = outfits.map(o => {
+    // Compute average rating across all stored ratings for this outfit
+    const avgRating = o.ratings?.length
+      ? Math.round((o.ratings.reduce((s, r) => s + r.rating, 0) / o.ratings.length) * 10) / 10
+      : null;
+    return { ...o, items: populateItems(o.itemIds), avgRating };
+  });
   res.json(populated);
 });
 
@@ -52,6 +58,7 @@ router.post('/', (req, res) => {
     id: Date.now().toString(),
     name,
     itemIds,
+    ratings: [],           // stores { rating, date } objects added via POST /:id/rate
     createdAt: new Date().toISOString()
   };
   outfits.push(newOutfit);
@@ -121,6 +128,24 @@ router.post('/:id/wear', (req, res) => {
   }
   writeJSON(CLOSET_PATH, items);
   res.json({ wornCount });
+});
+
+// POST /outfits/:id/rate — append a 1-5 star rating for this outfit
+router.post('/:id/rate', (req, res) => {
+  const { rating } = req.body; // expected 1-5
+  if (!rating || rating < 1 || rating > 5) {
+    return res.status(400).json({ error: 'rating must be 1-5' });
+  }
+  const outfits = readOutfits();
+  const idx = outfits.findIndex(o => o.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Outfit not found' });
+  if (!Array.isArray(outfits[idx].ratings)) outfits[idx].ratings = [];
+  outfits[idx].ratings.push({
+    rating: parseInt(rating),
+    date: new Date().toISOString().slice(0, 10)
+  });
+  writeOutfits(outfits);
+  res.json(outfits[idx]);
 });
 
 // DELETE /outfits/:id — remove a saved outfit

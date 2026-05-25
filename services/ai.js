@@ -298,4 +298,68 @@ Respond ONLY with valid JSON (no markdown, no explanation):
   return JSON.parse(raw);
 }
 
-module.exports = { analyzeImage, searchItem, searchItemOnline, findProductImage, findProductImages, suggestOutfit, smartSearch };
+// Pick a weather-appropriate outfit from the user's wardrobe
+async function suggestOutfitForWeather(items, tempF, condition) {
+  const wardrobe = items.map(i => ({
+    id: i.id, name: i.name, category: i.category,
+    color: i.color, brand: i.brand || null,
+    material: i.material || null, tags: i.tags || []
+  }));
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 512,
+    messages: [{
+      role: 'user',
+      content: `You are a personal stylist. It is currently ${tempF}°F and ${condition} outside. Choose a complete, weather-appropriate outfit from this wardrobe.
+
+Wardrobe: ${JSON.stringify(wardrobe)}
+
+Rules: pick one item per category needed, only use IDs listed above, prioritize weather appropriateness (temp ${tempF}°F, ${condition}).
+Respond ONLY with valid JSON (no markdown):
+{"name":"outfit name","itemIds":["id1","id2"],"reasoning":"one sentence explaining why this works for the weather"}`
+    }]
+  });
+
+  const raw = response.content[0].text.replace(/```json\n?|```/g, '').trim();
+  return JSON.parse(raw);
+}
+
+// Analyze the user's wardrobe and identify gaps/recommendations
+async function analyzeWardrobeGaps(items) {
+  const summary = items.map(i => ({
+    category: i.category, color: i.color,
+    brand: i.brand, material: i.material,
+    tags: i.tags, wearCount: i.wearCount || 0
+  }));
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 768,
+    messages: [{
+      role: 'user',
+      content: `You are a personal stylist analyzing someone's wardrobe. Based on this closet inventory, identify gaps and give actionable recommendations.
+
+Closet: ${JSON.stringify(summary)}
+
+Analyze: category balance, color versatility, occasion coverage (casual/work/formal/gym), and items that would complete the most outfit combinations.
+
+Respond ONLY with valid JSON (no markdown):
+{
+  "score": 75,
+  "scoreLabel": "Well-rounded",
+  "gaps": [
+    {"priority": "high", "item": "specific item to add", "reason": "one sentence why"},
+    {"priority": "medium", "item": "...", "reason": "..."}
+  ],
+  "strengths": ["one sentence about what they do well"],
+  "tip": "one overall styling tip"
+}`
+    }]
+  });
+
+  const raw = response.content[0].text.replace(/```json\n?|```/g, '').trim();
+  return JSON.parse(raw);
+}
+
+module.exports = { analyzeImage, searchItem, searchItemOnline, findProductImage, findProductImages, suggestOutfit, smartSearch, suggestOutfitForWeather, analyzeWardrobeGaps };

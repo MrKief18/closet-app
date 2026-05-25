@@ -9,9 +9,13 @@ const DB_PATH = path.join(__dirname, '../data/closet.json');
 function readItems() { return readJSON(DB_PATH); }
 function writeItems(items) { writeJSON(DB_PATH, items); }
 
-// GET /items — list all clothing items; optional ?category= and ?tag= filters
+// GET /items — list all clothing items; optional ?category=, ?tag=, ?includeArchived= filters
 router.get('/', (req, res) => {
   let items = readItems();
+  // By default, hide archived items; pass ?includeArchived=true to see them all
+  if (req.query.includeArchived !== 'true') {
+    items = items.filter(i => !i.isArchived);
+  }
   if (req.query.category) {
     items = items.filter(i => i.category.toLowerCase() === req.query.category.toLowerCase());
   }
@@ -95,9 +99,9 @@ router.get('/:id', (req, res) => {
 });
 
 // POST /items — add a new clothing item
-// Body: { name, category, color, size, brand?, material? }
+// Body: { name, category, color, size, brand?, material?, purchasePrice? }
 router.post('/', (req, res) => {
-  const { name, category, color, size, brand, material, imageUrl, tags } = req.body;
+  const { name, category, color, size, brand, material, imageUrl, tags, purchasePrice } = req.body;
   if (!name || !category || !color) {
     return res.status(400).json({ error: 'name, category, and color are required' });
   }
@@ -114,6 +118,9 @@ router.post('/', (req, res) => {
     tags: Array.isArray(tags) ? tags : [],
     wearCount: 0,
     lastWorn: null,
+    purchasePrice: purchasePrice || null, // Feature 2: cost-per-wear tracking
+    isDirty: false,                        // Feature 1: dirty/clean state
+    isArchived: false,                     // Feature 3: archive/seasonal storage
     addedAt: new Date().toISOString()
   };
   items.push(newItem);
@@ -126,7 +133,8 @@ router.patch('/:id', (req, res) => {
   const items = readItems();
   const idx = items.findIndex(i => i.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Item not found' });
-  const allowed = ['name', 'category', 'color', 'size', 'brand', 'material', 'imageUrl', 'tags'];
+  // purchasePrice added for Feature 2 (cost-per-wear)
+  const allowed = ['name', 'category', 'color', 'size', 'brand', 'material', 'imageUrl', 'tags', 'purchasePrice'];
   allowed.forEach(field => {
     if (req.body[field] !== undefined) items[idx][field] = req.body[field];
   });
@@ -145,6 +153,47 @@ router.post('/:id/wear', (req, res) => {
   if (!Array.isArray(items[idx].wearHistory)) items[idx].wearHistory = [];
   const localDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   items[idx].wearHistory.push(localDate);
+  items[idx].isDirty = true; // Feature 1: wearing an item makes it dirty
+  writeItems(items);
+  res.json(items[idx]);
+});
+
+// POST /items/:id/dirty — mark item as dirty (needs washing)
+router.post('/:id/dirty', (req, res) => {
+  const items = readItems();
+  const idx = items.findIndex(i => i.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Item not found' });
+  items[idx].isDirty = true;
+  writeItems(items);
+  res.json(items[idx]);
+});
+
+// POST /items/:id/clean — mark item as clean (freshly washed)
+router.post('/:id/clean', (req, res) => {
+  const items = readItems();
+  const idx = items.findIndex(i => i.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Item not found' });
+  items[idx].isDirty = false;
+  writeItems(items);
+  res.json(items[idx]);
+});
+
+// POST /items/:id/archive — move item to seasonal storage
+router.post('/:id/archive', (req, res) => {
+  const items = readItems();
+  const idx = items.findIndex(i => i.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Item not found' });
+  items[idx].isArchived = true;
+  writeItems(items);
+  res.json(items[idx]);
+});
+
+// POST /items/:id/unarchive — bring item back from storage
+router.post('/:id/unarchive', (req, res) => {
+  const items = readItems();
+  const idx = items.findIndex(i => i.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Item not found' });
+  items[idx].isArchived = false;
   writeItems(items);
   res.json(items[idx]);
 });
