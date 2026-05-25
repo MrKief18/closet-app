@@ -305,7 +305,7 @@ async function doSearch() {
 
   try {
     const data = await apiFetch(`/items/search?q=${encodeURIComponent(q)}`);
-    identifiedImageUrl = null;
+    identifiedImageUrl = data.imageUrl || null;
     populateIdentifiedForm(data.details);
   } catch (e) {
     errEl.textContent = e.message || 'Search failed.';

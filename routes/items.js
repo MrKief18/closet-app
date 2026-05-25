@@ -1,7 +1,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { searchItem } = require('../services/ai');
+const { searchItem, findProductImage } = require('../services/ai');
 
 const router = express.Router();
 const DB_PATH = path.join(__dirname, '../data/closet.json');
@@ -32,20 +32,22 @@ router.get('/search', async (req, res) => {
   if (!q) return res.status(400).json({ error: 'Query parameter q is required' });
   try {
     const details = await searchItem(q);
+    const imageUrl = await findProductImage(details);
 
     if (req.query.save === 'true') {
       const items = readItems();
       const newItem = {
         id: Date.now().toString(),
         ...details,
+        imageUrl: imageUrl || null,
         addedAt: new Date().toISOString()
       };
       items.push(newItem);
       writeItems(items);
-      return res.status(201).json({ query: q, details, saved: newItem });
+      return res.status(201).json({ query: q, details, imageUrl, saved: newItem });
     }
 
-    res.json({ query: q, details });
+    res.json({ query: q, details, imageUrl });
   } catch (err) {
     res.status(500).json({ error: 'Search failed', detail: err.message });
   }
