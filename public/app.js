@@ -11,24 +11,31 @@ const CAT_COLOR = {
 function catIcon(cat) { return CAT_ICON[cat] || '👗'; }
 function catColor(cat) { return CAT_COLOR[cat] || '#6b7280'; }
 
-// ── State ────────────────────────────────────────────────────────────────────
+// ── State ─────────────────────────────────────────────────────────────────────
 
 let currentFilter = '';
 let currentTagFilter = '';
+let currentSort = 'newest';
+let currentSearch = '';
 let selectedOutfitItems = new Set();
 let selectedPhotoFile = null;
 let identifiedImageUrl = null;
 let suggestOccasion = '';
 let suggestResult = null;
+let detailItemId = null;
+let detailOutfitId = null;
 
-// ── Init ─────────────────────────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
   setupNav();
   setupFilters();
+  setupSortAndSearch();
   setupAddItem();
   setupOutfitBuilder();
   setupSuggestModal();
+  setupItemDetail();
+  setupOutfitDetail();
   loadCloset();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
 });
@@ -52,6 +59,47 @@ function switchView(view) {
     document.getElementById('btn-show-camera').classList.add('active-option');
     document.getElementById('btn-show-search').classList.remove('active-option');
   }
+}
+
+// ── Sort & Search ─────────────────────────────────────────────────────────────
+
+function setupSortAndSearch() {
+  const searchEl = document.getElementById('closet-search');
+  const sortEl = document.getElementById('closet-sort');
+
+  let searchTimer;
+  searchEl.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      currentSearch = searchEl.value.trim().toLowerCase();
+      loadCloset();
+    }, 220);
+  });
+
+  sortEl.addEventListener('change', () => {
+    currentSort = sortEl.value;
+    loadCloset();
+  });
+}
+
+function applySort(items) {
+  const arr = [...items];
+  switch (currentSort) {
+    case 'oldest': return arr.sort((a, b) => a.addedAt.localeCompare(b.addedAt));
+    case 'name':   return arr.sort((a, b) => a.name.localeCompare(b.name));
+    case 'worn':   return arr.sort((a, b) => (b.wearCount || 0) - (a.wearCount || 0));
+    case 'never':  return arr.filter(i => !i.wearCount).concat(arr.filter(i => i.wearCount));
+    default:       return arr.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
+  }
+}
+
+function applySearch(items) {
+  if (!currentSearch) return items;
+  return items.filter(i =>
+    [i.name, i.brand, i.color, i.category, ...(i.tags || [])]
+      .filter(Boolean)
+      .some(f => f.toLowerCase().includes(currentSearch))
+  );
 }
 
 // ── Closet ────────────────────────────────────────────────────────────────────
@@ -82,7 +130,8 @@ async function loadCloset() {
   if (currentTagFilter) params.push(`tag=${encodeURIComponent(currentTagFilter)}`);
   const url = '/items' + (params.length ? '?' + params.join('&') : '');
   try {
-    const items = await apiFetch(url);
+    let items = await apiFetch(url);
+    items = applySearch(applySort(items));
     renderItemGrid('items-grid', items, false);
   } catch {
     document.getElementById('items-grid').innerHTML = '<p class="empty-state">Failed to load closet.</p>';
@@ -92,7 +141,7 @@ async function loadCloset() {
 function renderItemGrid(containerId, items, selectable) {
   const grid = document.getElementById(containerId);
   if (!items.length) {
-    grid.innerHTML = `<p class="empty-state">${selectable ? 'No items in closet.' : 'Your closet is empty — add some clothes!'}</p>`;
+    grid.innerHTML = `<p class="empty-state"><span class="empty-state-icon">👗</span>${selectable ? 'No items in closet.' : 'Your closet is empty — add some clothes!'}</p>`;
     return;
   }
   grid.innerHTML = items.map(item => {
@@ -105,28 +154,26 @@ function renderItemGrid(containerId, items, selectable) {
       <button class="btn-delete" data-id="${item.id}" title="Remove">×</button>`;
 
     if (item.imageUrl) {
-      // Full-bleed image card with gradient overlay
       return `
         <div class="item-card has-image" data-id="${item.id}" data-category="${item.category}">
           <img class="item-img" src="${esc(item.imageUrl)}" alt="${esc(item.name)}">
           <div class="item-overlay">
             <div class="item-name">${esc(item.name)}</div>
             <div class="item-meta">${esc(meta)}</div>
-            <span class="item-cat-badge" style="background:${color}44;color:${color}">${item.category}</span>
+            <span class="item-cat-badge" style="background:${color}33;color:${color}">${item.category}</span>
             ${tags ? `<div class="item-tags">${tags}</div>` : ''}
             ${wearInfo}
           </div>
           ${actionBtns}
         </div>`;
     } else {
-      // No-image card: emoji + info stacked, with Find Image button
       return `
         <div class="item-card" data-id="${item.id}" data-category="${item.category}">
-          <div class="item-icon" style="background:${color}22">${catIcon(item.category)}</div>
+          <div class="item-icon" style="background:${color}18">${catIcon(item.category)}</div>
           <div class="item-info">
             <div class="item-name">${esc(item.name)}</div>
             <div class="item-meta">${esc(meta)}</div>
-            <span class="item-cat-badge" style="background:${color}22;color:${color}">${item.category}</span>
+            <span class="item-cat-badge" style="background:${color}18;color:${color}">${item.category}</span>
             ${tags ? `<div class="item-tags">${tags}</div>` : ''}
             ${wearInfo}
             ${selectable ? '' : `<button class="btn-find-img" data-id="${item.id}">🔍 Find Image</button>`}
@@ -159,6 +206,12 @@ function renderItemGrid(containerId, items, selectable) {
     grid.querySelectorAll('.btn-find-img').forEach(btn => {
       btn.addEventListener('click', e => { e.stopPropagation(); findImageForItem(btn); });
     });
+    grid.querySelectorAll('.item-card').forEach(card => {
+      card.addEventListener('click', e => {
+        if (e.target.closest('button')) return;
+        openItemDetail(card.dataset.id);
+      });
+    });
   }
 }
 
@@ -167,7 +220,7 @@ async function deleteItem(id) {
     await apiFetch(`/items/${id}`, { method: 'DELETE' });
     showToast('Item removed');
     loadCloset();
-  } catch (e) {
+  } catch {
     showToast('Failed to remove item', true);
   }
 }
@@ -197,6 +250,94 @@ async function findImageForItem(btn) {
   }
 }
 
+// ── Item Detail Modal ─────────────────────────────────────────────────────────
+
+function setupItemDetail() {
+  document.getElementById('btn-close-detail').addEventListener('click', closeItemDetail);
+  document.getElementById('item-detail-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeItemDetail();
+  });
+  document.getElementById('btn-detail-wear').addEventListener('click', () => {
+    closeItemDetail();
+    wearItem(detailItemId);
+  });
+  document.getElementById('btn-detail-find-img').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-detail-find-img');
+    btn.disabled = true;
+    btn.textContent = 'Searching…';
+    try {
+      await apiFetch(`/items/${detailItemId}/image`, { method: 'POST' });
+      showToast('Image found!');
+      closeItemDetail();
+      loadCloset();
+    } catch {
+      showToast('No image found', true);
+      btn.disabled = false;
+      btn.textContent = '🔍 Find Image';
+    }
+  });
+  document.getElementById('btn-detail-delete').addEventListener('click', () => {
+    closeItemDetail();
+    deleteItem(detailItemId);
+  });
+}
+
+async function openItemDetail(id) {
+  detailItemId = id;
+  try {
+    const item = await apiFetch(`/items/${id}`);
+    const color = catColor(item.category);
+
+    const img = document.getElementById('detail-img');
+    const icon = document.getElementById('detail-icon');
+    const wrap = document.getElementById('detail-image-wrap');
+
+    if (item.imageUrl) {
+      img.src = item.imageUrl;
+      img.alt = item.name;
+      img.classList.remove('hidden');
+      icon.classList.add('hidden');
+    } else {
+      img.classList.add('hidden');
+      icon.textContent = catIcon(item.category);
+      icon.classList.remove('hidden');
+      wrap.style.background = color + '18';
+    }
+
+    const findBtn = document.getElementById('btn-detail-find-img');
+    findBtn.classList.toggle('hidden', !!item.imageUrl);
+    findBtn.disabled = false;
+    findBtn.textContent = '🔍 Find Image';
+
+    document.getElementById('detail-name').textContent = item.name;
+    const badge = document.getElementById('detail-cat-badge');
+    badge.textContent = item.category;
+    badge.style.background = color + '22';
+    badge.style.color = color;
+
+    document.getElementById('detail-color').textContent = item.color || '—';
+    document.getElementById('detail-size').textContent = item.size || '—';
+    document.getElementById('detail-brand').textContent = item.brand || '—';
+
+    const wearText = item.wearCount
+      ? `${item.wearCount}× ${item.lastWorn ? '· ' + new Date(item.lastWorn).toLocaleDateString() : ''}`
+      : 'Never worn';
+    document.getElementById('detail-wear').textContent = wearText;
+
+    document.getElementById('detail-tags').innerHTML =
+      (item.tags || []).map(t => `<span class="tag-chip">${esc(t)}</span>`).join('');
+
+    document.getElementById('item-detail-modal').classList.remove('hidden');
+  } catch {
+    showToast('Failed to load item', true);
+  }
+}
+
+function closeItemDetail() {
+  document.getElementById('item-detail-modal').classList.add('hidden');
+  detailItemId = null;
+}
+
 // ── Outfits ───────────────────────────────────────────────────────────────────
 
 async function loadOutfits() {
@@ -204,30 +345,35 @@ async function loadOutfits() {
     const outfits = await apiFetch('/outfits');
     const list = document.getElementById('outfits-list');
     if (!outfits.length) {
-      list.innerHTML = '<p class="empty-state">No outfits saved yet — build one!</p>';
+      list.innerHTML = '<p class="empty-state"><span class="empty-state-icon">👔</span>No outfits saved yet — build one!</p>';
       return;
     }
     list.innerHTML = outfits.map(o => {
-      const thumbs = (o.items || []).slice(0, 4).map(i =>
+      const strip = (o.items || []).slice(0, 4).map(i =>
         i.imageUrl
-          ? `<img class="outfit-thumb" src="${esc(i.imageUrl)}" alt="${esc(i.name || '')}">`
-          : `<div class="outfit-thumb-icon" style="background:${catColor(i.category)}22">${catIcon(i.category)}</div>`
+          ? `<img class="outfit-strip-img" src="${esc(i.imageUrl)}" alt="${esc(i.name || '')}">`
+          : `<div class="outfit-strip-icon" style="background:${catColor(i.category)}18">${catIcon(i.category)}</div>`
       ).join('');
+
       return `
         <div class="outfit-card" data-id="${o.id}">
-          <div class="outfit-thumbs">${thumbs}</div>
-          <div class="outfit-body">
-            <div class="outfit-name">${esc(o.name)}</div>
-            <div class="outfit-items">
-              ${(o.items || []).map(i => `<span class="outfit-chip">${esc(i.name || '?')}</span>`).join('')}
-            </div>
+          <div class="outfit-image-strip">${strip || '<div class="outfit-strip-icon" style="background:var(--surface2);flex:1">👔</div>'}</div>
+          <div class="outfit-card-body">
+            <span class="outfit-name">${esc(o.name)}</span>
+            <span class="outfit-item-count">${(o.items || []).length} items</span>
+            <button class="btn-delete-outfit" data-id="${o.id}" title="Delete">×</button>
           </div>
-          <button class="btn-delete-outfit" data-id="${o.id}" title="Delete">×</button>
         </div>`;
     }).join('');
 
+    list.querySelectorAll('.outfit-card').forEach(card => {
+      card.addEventListener('click', e => {
+        if (e.target.closest('.btn-delete-outfit')) return;
+        openOutfitDetail(card.dataset.id);
+      });
+    });
     list.querySelectorAll('.btn-delete-outfit').forEach(btn => {
-      btn.addEventListener('click', () => deleteOutfit(btn.dataset.id));
+      btn.addEventListener('click', e => { e.stopPropagation(); deleteOutfit(btn.dataset.id); });
     });
   } catch {
     document.getElementById('outfits-list').innerHTML = '<p class="empty-state">Failed to load outfits.</p>';
@@ -241,6 +387,53 @@ async function deleteOutfit(id) {
     loadOutfits();
   } catch {
     showToast('Failed to delete outfit', true);
+  }
+}
+
+// ── Outfit Detail Modal ───────────────────────────────────────────────────────
+
+function setupOutfitDetail() {
+  const close = () => {
+    document.getElementById('outfit-detail-modal').classList.add('hidden');
+    detailOutfitId = null;
+  };
+  document.getElementById('btn-close-outfit-detail').addEventListener('click', close);
+  document.getElementById('btn-close-outfit-detail2').addEventListener('click', close);
+  document.getElementById('outfit-detail-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) close();
+  });
+  document.getElementById('btn-outfit-detail-delete').addEventListener('click', () => {
+    close();
+    deleteOutfit(detailOutfitId);
+  });
+}
+
+async function openOutfitDetail(id) {
+  detailOutfitId = id;
+  try {
+    const outfits = await apiFetch('/outfits');
+    const outfit = outfits.find(o => o.id === id);
+    if (!outfit) return;
+
+    document.getElementById('outfit-detail-name').textContent = outfit.name;
+    document.getElementById('btn-outfit-detail-delete').dataset.id = id;
+
+    const items = outfit.items || [];
+    document.getElementById('outfit-detail-grid').innerHTML = items.map(i => `
+      <div class="outfit-detail-item">
+        ${i.imageUrl
+          ? `<img src="${esc(i.imageUrl)}" alt="${esc(i.name || '')}">`
+          : `<div class="outfit-detail-item-icon" style="background:${catColor(i.category)}18">${catIcon(i.category)}</div>`
+        }
+        <div class="outfit-detail-item-name">${esc(i.name || '')}</div>
+      </div>`).join('');
+
+    document.getElementById('outfit-detail-chips').innerHTML = items.map(i => `
+      <span class="outfit-detail-chip">${catIcon(i.category)} ${esc(i.name || '')}</span>`).join('');
+
+    document.getElementById('outfit-detail-modal').classList.remove('hidden');
+  } catch {
+    showToast('Failed to load outfit', true);
   }
 }
 
@@ -263,8 +456,6 @@ async function openOutfitModal() {
 
   try {
     const items = await apiFetch('/items');
-    const grid = document.getElementById('modal-items-grid');
-    grid.innerHTML = '';
     renderItemGrid('modal-items-grid', items, true);
   } catch {
     document.getElementById('modal-items-grid').innerHTML = '<p class="empty-state">Could not load items.</p>';
@@ -300,7 +491,6 @@ async function saveOutfit() {
 // ── Add Item ──────────────────────────────────────────────────────────────────
 
 function setupAddItem() {
-  // Panel toggles
   document.getElementById('btn-show-camera').addEventListener('click', () => {
     showPanel('panel-camera');
     resetIdentifiedForm();
@@ -314,19 +504,16 @@ function setupAddItem() {
     document.getElementById('btn-show-camera').classList.remove('active-option');
   });
 
-  // Camera flow
   const cameraInput = document.getElementById('camera-input');
   document.getElementById('btn-choose-photo').addEventListener('click', () => cameraInput.click());
   cameraInput.addEventListener('change', onPhotoSelected);
   document.getElementById('btn-analyze').addEventListener('click', analyzePhoto);
 
-  // Search flow
   document.getElementById('btn-do-search').addEventListener('click', doSearch);
   document.getElementById('search-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') doSearch();
   });
 
-  // Form actions
   document.getElementById('btn-save-item').addEventListener('click', saveIdentifiedItem);
   document.getElementById('btn-discard').addEventListener('click', () => {
     resetIdentifiedForm();
@@ -356,7 +543,6 @@ function onPhotoSelected() {
 
 async function analyzePhoto() {
   if (!selectedPhotoFile) return;
-
   const loadingEl = document.getElementById('camera-loading');
   const errEl = document.getElementById('camera-error');
   const analyzeBtn = document.getElementById('btn-analyze');
@@ -384,7 +570,6 @@ async function analyzePhoto() {
 async function doSearch() {
   const q = document.getElementById('search-input').value.trim();
   if (!q) return;
-
   const loadingEl = document.getElementById('search-loading');
   const errEl = document.getElementById('search-error');
   const searchBtn = document.getElementById('btn-do-search');
@@ -445,9 +630,7 @@ async function saveIdentifiedItem() {
 
   const tags = [...document.querySelectorAll('.tag-check:checked')].map(cb => cb.value);
   const body = {
-    name,
-    category: document.getElementById('f-category').value,
-    color,
+    name, category: document.getElementById('f-category').value, color,
     size: document.getElementById('f-size').value.trim() || null,
     brand: document.getElementById('f-brand').value.trim() || null,
     imageUrl: identifiedImageUrl || null,
@@ -470,7 +653,7 @@ async function saveIdentifiedItem() {
   }
 }
 
-// ── Stats ─────────────────────────────────────────────────────────────────────
+// ── Stats ──────────────────────────────────────────────────────────────────────
 
 async function loadStats() {
   try {
@@ -490,7 +673,7 @@ function renderStats(d) {
       <div class="stat-card"><div class="stat-num">${d.totalItems}</div><div class="stat-label">Items</div></div>
       <div class="stat-card"><div class="stat-num">${d.totalOutfits}</div><div class="stat-label">Outfits</div></div>
       <div class="stat-card"><div class="stat-num">${d.neverWorn}</div><div class="stat-label">Never Worn</div></div>
-      <div class="stat-card"><div class="stat-num">${d.wornThisMonth}</div><div class="stat-label">Worn This Month</div></div>
+      <div class="stat-card"><div class="stat-num">${d.wornThisMonth}</div><div class="stat-label">This Month</div></div>
     </div>
     <div class="stats-panels">
       <div class="stats-panel">
@@ -563,9 +746,13 @@ async function requestSuggestion(occasion) {
 
     const allItems = await apiFetch('/items');
     const picked = (data.itemIds || []).map(id => allItems.find(i => i.id === id)).filter(Boolean);
+
     document.getElementById('suggest-items-list').innerHTML = picked.map(i => `
       <div class="suggest-item-row">
-        <span>${catIcon(i.category)}</span>
+        ${i.imageUrl
+          ? `<img class="suggest-item-thumb" src="${esc(i.imageUrl)}" alt="${esc(i.name)}">`
+          : `<div class="suggest-item-thumb suggest-item-thumb-icon" style="background:${catColor(i.category)}18">${catIcon(i.category)}</div>`
+        }
         <span class="suggest-item-name">${esc(i.name)}</span>
         <span class="item-cat-badge" style="background:${catColor(i.category)}22;color:${catColor(i.category)}">${i.category}</span>
       </div>`).join('');
@@ -584,7 +771,10 @@ async function saveSuggestion() {
   const errEl = document.getElementById('suggest-save-error');
   errEl.classList.add('hidden');
   try {
-    await apiFetch('/outfits', { method: 'POST', body: JSON.stringify({ name: suggestResult.name, itemIds: suggestResult.itemIds }) });
+    await apiFetch('/outfits', {
+      method: 'POST',
+      body: JSON.stringify({ name: suggestResult.name, itemIds: suggestResult.itemIds })
+    });
     closeSuggestModal();
     showToast('Outfit saved!');
     loadOutfits();

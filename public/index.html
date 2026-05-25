@@ -24,6 +24,19 @@
 
     <!-- ── Closet View ── -->
     <section id="view-closet" class="view active">
+      <div class="closet-toolbar">
+        <div class="search-box">
+          <span class="search-icon">⌕</span>
+          <input type="text" id="closet-search" placeholder="Search items…" class="closet-search-input">
+        </div>
+        <select id="closet-sort" class="sort-select">
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="name">Name A–Z</option>
+          <option value="worn">Most Worn</option>
+          <option value="never">Never Worn</option>
+        </select>
+      </div>
       <div class="filter-bar">
         <button class="filter active" data-cat="">All</button>
         <button class="filter" data-cat="tops">Tops</button>
@@ -179,6 +192,49 @@
       <div class="modal-actions">
         <button id="btn-save-outfit" class="btn-primary">Save Outfit</button>
         <button id="btn-cancel-outfit" class="btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Outfit Detail Modal ── -->
+  <div id="outfit-detail-modal" class="modal-overlay hidden">
+    <div class="modal outfit-detail-modal">
+      <button class="btn-close-modal" id="btn-close-outfit-detail">×</button>
+      <h2 id="outfit-detail-name"></h2>
+      <div id="outfit-detail-grid" class="outfit-detail-grid"></div>
+      <div id="outfit-detail-chips" class="outfit-detail-chips"></div>
+      <div class="modal-actions">
+        <button id="btn-outfit-detail-delete" class="btn-secondary btn-danger">Delete Outfit</button>
+        <button id="btn-close-outfit-detail2" class="btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Item Detail Modal ── -->
+  <div id="item-detail-modal" class="modal-overlay hidden">
+    <div class="modal item-detail-modal">
+      <button id="btn-close-detail" class="btn-close-detail">×</button>
+      <div class="detail-image-wrap" id="detail-image-wrap">
+        <img id="detail-img" src="" alt="" class="detail-img hidden">
+        <div id="detail-icon" class="detail-icon hidden"></div>
+      </div>
+      <div class="detail-body">
+        <div>
+          <h2 id="detail-name"></h2>
+          <span id="detail-cat-badge" class="item-cat-badge"></span>
+        </div>
+        <div class="detail-meta-grid">
+          <div class="detail-meta-item"><span class="detail-meta-label">Color</span><span id="detail-color"></span></div>
+          <div class="detail-meta-item"><span class="detail-meta-label">Size</span><span id="detail-size"></span></div>
+          <div class="detail-meta-item"><span class="detail-meta-label">Brand</span><span id="detail-brand"></span></div>
+          <div class="detail-meta-item"><span class="detail-meta-label">Worn</span><span id="detail-wear"></span></div>
+        </div>
+        <div id="detail-tags" class="item-tags"></div>
+        <div class="detail-actions">
+          <button id="btn-detail-wear" class="btn-primary">✓ Log Wear</button>
+          <button id="btn-detail-find-img" class="btn-secondary hidden">🔍 Find Image</button>
+          <button id="btn-detail-delete" class="btn-secondary btn-danger">Delete</button>
+        </div>
       </div>
     </div>
   </div>
