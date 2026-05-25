@@ -198,13 +198,14 @@ router.post('/:id/unarchive', (req, res) => {
   res.json(items[idx]);
 });
 
-// GET /items/:id/images — return multiple image options for user selection
+// GET /items/:id/images — return 6 image options; ?page=N fetches the next set
 router.get('/:id/images', async (req, res) => {
   const items = readItems();
   const item = items.find(i => i.id === req.params.id);
   if (!item) return res.status(404).json({ error: 'Item not found' });
+  const page = Math.max(0, parseInt(req.query.page) || 0);
   try {
-    const images = await findProductImages(item, 6);
+    const images = await findProductImages(item, 6, page * 6);
     res.json({ images });
   } catch (err) {
     res.status(500).json({ error: 'Image search failed', detail: err.message });

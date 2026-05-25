@@ -420,6 +420,7 @@ async function findImageForItem(btn) {
 // ── Item Detail Modal ─────────────────────────────────────────────────────────
 
 let selectedImageUrl = null; // tracks image chosen in picker
+let _imagePickerPage = 0;   // increments on each Refresh so we get a fresh set
 
 function setupItemDetail() {
   document.getElementById('btn-close-detail').addEventListener('click', closeItemDetail);
@@ -512,6 +513,7 @@ function enterEditMode() {
 
   // Reset image picker
   selectedImageUrl = item.imageUrl || null;
+  _imagePickerPage = 0;
   document.getElementById('image-picker-grid').classList.add('hidden');
   document.getElementById('image-picker-grid').innerHTML = '';
   document.getElementById('image-picker-loading').classList.add('hidden');
@@ -538,14 +540,18 @@ async function loadImagePicker() {
   loading.classList.remove('hidden');
 
   try {
-    const data = await apiFetch(`/items/${detailItemId}/images`);
+    const data = await apiFetch(`/items/${detailItemId}/images?page=${_imagePickerPage}`);
     loading.classList.add('hidden');
 
     if (!data.images.length) {
-      btn.textContent = 'No images found';
+      // Wrap back to page 0 if we've run out
+      _imagePickerPage = 0;
+      btn.textContent = 'No more images — try again';
       btn.disabled = false;
       return;
     }
+
+    _imagePickerPage++; // next Refresh fetches the next set of 6
 
     grid.innerHTML = data.images.map((url, i) =>
       `<img class="image-picker-thumb${selectedImageUrl === url ? ' selected' : ''}"
@@ -558,7 +564,6 @@ async function loadImagePicker() {
         grid.querySelectorAll('.image-picker-thumb').forEach(t => t.classList.remove('selected'));
         img.classList.add('selected');
         selectedImageUrl = img.dataset.url;
-        // Live-preview the selection on the modal image
         const detailImg = document.getElementById('detail-img');
         detailImg.src = selectedImageUrl;
         detailImg.classList.remove('hidden');
@@ -567,7 +572,7 @@ async function loadImagePicker() {
     });
 
     grid.classList.remove('hidden');
-    btn.textContent = 'Refresh';
+    btn.textContent = 'Refresh (next 6)';
     btn.disabled = false;
   } catch {
     loading.classList.add('hidden');

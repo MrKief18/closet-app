@@ -174,14 +174,14 @@ Respond ONLY with valid JSON (no markdown):
   return { details, variants: variantsWithImages, products };
 }
 
-// Return up to `count` product image URLs for user selection
-async function findProductImages(details, count = 6) {
+// Return up to `count` product image URLs for user selection; `start` offsets for pagination
+async function findProductImages(details, count = 6, start = 0) {
   const q = [details.brand, details.name, details.color].filter(Boolean).join(' ');
   const serpKey = process.env.SERPAPI_KEY;
   if (serpKey) {
     try {
       const url = `https://serpapi.com/search.json` +
-        `?engine=google_images&q=${encodeURIComponent(q + ' product')}&num=${count}&api_key=${serpKey}`;
+        `?engine=google_images&q=${encodeURIComponent(q + ' product')}&num=${count}&start=${start}&api_key=${serpKey}`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
