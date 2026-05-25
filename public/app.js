@@ -889,14 +889,20 @@ async function openOutfitDetail(id) {
     document.getElementById('btn-outfit-detail-delete').dataset.id = id;
 
     const items = outfit.items || [];
-    document.getElementById('outfit-detail-grid').innerHTML = items.map(i => `
-      <div class="outfit-detail-item">
+    const grid = document.getElementById('outfit-detail-grid');
+    grid.innerHTML = items.map(i => `
+      <div class="outfit-detail-item" data-id="${i.id}" title="View details">
         ${i.imageUrl
           ? `<img src="${esc(i.imageUrl)}" alt="${esc(i.name || '')}">`
           : `<div class="outfit-detail-item-icon" style="background:${catColor(i.category)}18">${catIcon(i.category)}</div>`
         }
         <div class="outfit-detail-item-name">${esc(i.name || '')}</div>
+        <div class="outfit-detail-item-tap">tap to expand</div>
       </div>`).join('');
+
+    grid.querySelectorAll('.outfit-detail-item[data-id]').forEach(card => {
+      card.addEventListener('click', () => openItemDetail(card.dataset.id));
+    });
 
     document.getElementById('outfit-detail-chips').innerHTML = items.map(i => `
       <span class="outfit-detail-chip">${catIcon(i.category)} ${esc(i.name || '')}</span>`).join('');
