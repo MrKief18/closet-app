@@ -59,24 +59,54 @@ async function analyzeImage(base64Data, mediaType) {
     ]
   });
 
-  return JSON.parse(response.content[0].text);
+  const _raw = response.content[0].text.replace(/```json\\n?|```/g, "").trim(); return JSON.parse(_raw);
 }
 
-// Look up clothing item details from a text search query
+// Resolve a loose description to precise clothing details
 async function searchItem(query) {
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 256,
     system: [SYSTEM_PROMPT],
-    messages: [
-      {
-        role: 'user',
-        content: `Return clothing item details for: "${query}"`
-      }
-    ]
+    messages: [{
+      role: 'user',
+      content: `The user described a clothing item — resolve it to the correct official product details, fixing any typos, abbreviations, or brand-specific naming variations: "${query}"`
+    }]
   });
 
-  return JSON.parse(response.content[0].text);
+  const raw = response.content[0].text.replace(/```json\n?|```/g, '').trim();
+  return JSON.parse(raw);
+}
+
+// Identify exact product from description, then find real listings via Google Shopping
+async function searchItemOnline(query) {
+  // Step 1: Claude resolves the description to a precise product
+  const details = await searchItem(query);
+
+  // Step 2: Google Shopping search for real product listings
+  const q = [details.brand, details.name, details.color].filter(Boolean).join(' ');
+  const serpKey = process.env.SERPAPI_KEY;
+  let products = [];
+
+  if (serpKey) {
+    try {
+      const url = `https://serpapi.com/search.json` +
+        `?engine=google_shopping&q=${encodeURIComponent(q)}&num=6&api_key=${serpKey}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        products = (data.shopping_results || []).slice(0, 6).map(p => ({
+          title:     p.title,
+          price:     p.price || null,
+          source:    p.source || null,
+          thumbnail: p.thumbnail || null,
+          link:      p.link || null
+        }));
+      }
+    } catch {}
+  }
+
+  return { details, products };
 }
 
 // Return up to `count` product image URLs for user selection
@@ -161,7 +191,7 @@ Respond ONLY with valid JSON (no markdown):
     }]
   });
 
-  return JSON.parse(response.content[0].text);
+  const _raw = response.content[0].text.replace(/```json\\n?|```/g, "").trim(); return JSON.parse(_raw);
 }
 
 // Smart search — identifies the exact product from a loose description, then matches closet items
@@ -203,4 +233,4 @@ Respond ONLY with valid JSON (no markdown, no explanation):
   return JSON.parse(raw);
 }
 
-module.exports = { analyzeImage, searchItem, findProductImage, findProductImages, suggestOutfit, smartSearch };
+module.exports = { analyzeImage, searchItem, searchItemOnline, findProductImage, findProductImages, suggestOutfit, smartSearch };

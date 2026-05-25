@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const { searchItem, findProductImage, findProductImages, smartSearch } = require('../services/ai');
+const { searchItem, searchItemOnline, findProductImage, findProductImages, smartSearch } = require('../services/ai');
 const { readJSON, writeJSON } = require('../services/db');
 
 const router = express.Router();
@@ -21,14 +21,15 @@ router.get('/', (req, res) => {
   res.json(items);
 });
 
-// GET /items/search?q= — use Claude to look up clothing details from a text query
-// Add ?save=true to auto-add the result to the closet
+// GET /items/search?q= — identify product from description + return Google Shopping results
 router.get('/search', async (req, res) => {
   const { q } = req.query;
   if (!q) return res.status(400).json({ error: 'Query parameter q is required' });
   try {
-    const details = await searchItem(q);
-    const imageUrl = await findProductImage(details);
+    const { details, products } = await searchItemOnline(q);
+
+    // Pick the best image: first shopping thumbnail, then SerpAPI image search
+    const imageUrl = products[0]?.thumbnail || await findProductImage(details);
 
     if (req.query.save === 'true') {
       const items = readItems();
@@ -36,14 +37,15 @@ router.get('/search', async (req, res) => {
         id: Date.now().toString(),
         ...details,
         imageUrl: imageUrl || null,
+        tags: [], wearCount: 0, lastWorn: null,
         addedAt: new Date().toISOString()
       };
       items.push(newItem);
       writeItems(items);
-      return res.status(201).json({ query: q, details, imageUrl, saved: newItem });
+      return res.status(201).json({ query: q, details, imageUrl, products, saved: newItem });
     }
 
-    res.json({ query: q, details, imageUrl });
+    res.json({ query: q, details, imageUrl, products });
   } catch (err) {
     res.status(500).json({ error: 'Search failed', detail: err.message });
   }

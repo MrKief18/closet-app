@@ -819,17 +819,26 @@ async function analyzePhoto() {
 async function doSearch() {
   const q = document.getElementById('search-input').value.trim();
   if (!q) return;
-  const loadingEl = document.getElementById('search-loading');
-  const errEl = document.getElementById('search-error');
-  const searchBtn = document.getElementById('btn-do-search');
+  const loadingEl  = document.getElementById('search-loading');
+  const errEl      = document.getElementById('search-error');
+  const searchBtn  = document.getElementById('btn-do-search');
+  const shoppingEl = document.getElementById('shopping-results');
   errEl.classList.add('hidden');
+  shoppingEl.classList.add('hidden');
+  document.getElementById('identified-form').classList.add('hidden');
   loadingEl.classList.remove('hidden');
   searchBtn.disabled = true;
 
   try {
     const data = await apiFetch(`/items/search?q=${encodeURIComponent(q)}`);
-    identifiedImageUrl = data.imageUrl || null;
-    populateIdentifiedForm(data.details);
+
+    if (data.products && data.products.length > 0) {
+      renderShoppingResults(data.products, data.details, data.imageUrl);
+    } else {
+      // No shopping results — fall back to direct form fill
+      identifiedImageUrl = data.imageUrl || null;
+      populateIdentifiedForm(data.details);
+    }
   } catch (e) {
     errEl.textContent = e.message || 'Search failed.';
     errEl.classList.remove('hidden');
@@ -837,6 +846,47 @@ async function doSearch() {
     loadingEl.classList.add('hidden');
     searchBtn.disabled = false;
   }
+}
+
+function renderShoppingResults(products, fallbackDetails, fallbackImageUrl) {
+  const grid = document.getElementById('shopping-grid');
+  const shoppingEl = document.getElementById('shopping-results');
+
+  grid.innerHTML = products.map((p, i) => `
+    <div class="shopping-card" data-idx="${i}">
+      ${p.thumbnail
+        ? `<img class="shopping-card-img" src="${esc(p.thumbnail)}" alt="${esc(p.title)}" onerror="this.parentElement.querySelector('.shopping-card-img-placeholder').style.display='flex';this.style.display='none'">`
+        : ''
+      }
+      <div class="shopping-card-img-placeholder" style="${p.thumbnail ? 'display:none' : ''}">👗</div>
+      <div class="shopping-card-body">
+        <div class="shopping-card-title">${esc(p.title)}</div>
+        <div class="shopping-card-meta">
+          ${p.price ? `<span class="shopping-card-price">${esc(p.price)}</span>` : ''}
+          ${p.source ? `<span> · ${esc(p.source)}</span>` : ''}
+        </div>
+      </div>
+    </div>`).join('');
+
+  shoppingEl.classList.remove('hidden');
+
+  // Click a card to select it and populate the form
+  grid.querySelectorAll('.shopping-card').forEach((card, idx) => {
+    card.addEventListener('click', () => {
+      grid.querySelectorAll('.shopping-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+
+      const p = products[idx];
+      identifiedImageUrl = p.thumbnail || fallbackImageUrl || null;
+
+      // Use Claude's identified details but override with the product's real title
+      const details = { ...fallbackDetails, name: p.title };
+      populateIdentifiedForm(details);
+    });
+  });
+
+  // Auto-select the first card
+  grid.querySelector('.shopping-card')?.click();
 }
 
 function populateIdentifiedForm(details) {
@@ -860,6 +910,8 @@ function resetIdentifiedForm() {
   document.getElementById('btn-analyze').classList.add('hidden');
   document.getElementById('camera-input').value = '';
   document.getElementById('search-input').value = '';
+  document.getElementById('shopping-results').classList.add('hidden');
+  document.getElementById('shopping-grid').innerHTML = '';
   document.querySelectorAll('.tag-check').forEach(cb => { cb.checked = false; });
   selectedPhotoFile = null;
   identifiedImageUrl = null;

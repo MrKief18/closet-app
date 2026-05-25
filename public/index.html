@@ -107,11 +107,16 @@
       <!-- Search panel -->
       <div id="panel-search" class="input-panel hidden">
         <div class="search-row">
-          <input type="text" id="search-input" placeholder="e.g. black leather jacket, white Nike sneakers…" class="text-field">
-          <button id="btn-do-search" class="btn-primary">Look Up</button>
+          <input type="text" id="search-input" placeholder="Describe any item — brand, style, color, fit… (e.g. 'Rag Bone Fit 4 jeans', 'white Nike low tops')" class="text-field">
+          <button id="btn-do-search" class="btn-primary">Search</button>
         </div>
-        <div id="search-loading" class="loading hidden">Looking up item…</div>
+        <div id="search-loading" class="loading hidden">Finding item…</div>
         <div id="search-error" class="error-msg hidden"></div>
+        <!-- Shopping results grid -->
+        <div id="shopping-results" class="shopping-results hidden">
+          <p class="shopping-results-label">Select the exact item:</p>
+          <div id="shopping-grid" class="shopping-grid"></div>
+        </div>
       </div>
 
       <!-- Identified item form (shared by camera + search) -->
