@@ -1066,9 +1066,45 @@ main { padding: 28px; max-width: 1040px; margin: 0 auto; }
   gap: 12px;
   flex-wrap: wrap;
 }
-.weather-info { display: flex; align-items: center; gap: 8px; flex: 1; }
-.weather-icon { font-size: 24px; }
+.weather-info { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.weather-icon { font-size: 24px; flex-shrink: 0; }
+.weather-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .weather-desc { font-size: 13px; color: var(--text2); }
+.weather-location-row { display: flex; align-items: center; gap: 6px; }
+.weather-location-name { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.btn-change-location { background: none; border: none; color: var(--blue); font-size: 11px; cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0; }
+.btn-change-location:hover { text-decoration: underline; }
+
+/* Location search panel — full-width row below weather info */
+.location-search-panel {
+  width: 100%;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+.location-search-input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.location-search-input:focus { border-color: var(--blue); }
+.location-search-input::placeholder { color: var(--muted); }
+.location-results { margin-top: 6px; }
+.location-result-item {
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s;
+}
+.location-result-item:hover { background: var(--surface3); }
 .btn-weather-suggest {
   background: linear-gradient(135deg, var(--blue), #818cf8);
   border: none;

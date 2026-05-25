@@ -25,13 +25,24 @@
 
     <!-- ── Closet View ── -->
     <section id="view-closet" class="view active">
-      <!-- Weather-aware daily outfit widget — shown only when geolocation is granted -->
+      <!-- Weather-aware daily outfit widget -->
       <div id="weather-widget" class="weather-widget hidden">
         <div class="weather-info">
           <span id="weather-icon" class="weather-icon"></span>
-          <span id="weather-desc" class="weather-desc"></span>
+          <div class="weather-text">
+            <span id="weather-desc" class="weather-desc"></span>
+            <div class="weather-location-row">
+              <span id="weather-location-name" class="weather-location-name">Current Location</span>
+              <button id="btn-change-location" class="btn-change-location">📍 Change</button>
+            </div>
+          </div>
         </div>
         <button id="btn-weather-suggest" class="btn-weather-suggest">✨ Today's Pick</button>
+        <!-- Location search panel -->
+        <div id="location-search-panel" class="location-search-panel hidden">
+          <input type="text" id="location-search-input" class="location-search-input" placeholder="Search city or town…" autocomplete="off">
+          <div id="location-results" class="location-results"></div>
+        </div>
         <div id="weather-loading" class="loading hidden">Finding the perfect outfit…</div>
         <div id="weather-result" class="weather-result hidden">
           <div id="weather-outfit-name" class="weather-outfit-name"></div>
