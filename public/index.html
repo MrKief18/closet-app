@@ -3,8 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#60a5fa">
   <title>Closet App</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
 </head>
 <body>
 
@@ -13,6 +15,7 @@
     <nav>
       <button class="tab active" data-view="closet">My Closet</button>
       <button class="tab" data-view="outfits">Outfits</button>
+      <button class="tab" data-view="stats">Stats</button>
       <button class="tab" data-view="add">+ Add Item</button>
     </nav>
   </header>
@@ -29,6 +32,14 @@
         <button class="filter" data-cat="outerwear">Outerwear</button>
         <button class="filter" data-cat="accessories">Accessories</button>
       </div>
+      <div class="filter-bar tag-filter-bar">
+        <button class="filter active" data-tag="">All Tags</button>
+        <button class="filter" data-tag="casual">Casual</button>
+        <button class="filter" data-tag="work">Work</button>
+        <button class="filter" data-tag="formal">Formal</button>
+        <button class="filter" data-tag="gym">Gym</button>
+        <button class="filter" data-tag="outdoor">Outdoor</button>
+      </div>
       <div id="items-grid" class="items-grid"></div>
     </section>
 
@@ -36,9 +47,17 @@
     <section id="view-outfits" class="view">
       <div class="section-header">
         <h2>Saved Outfits</h2>
-        <button id="btn-new-outfit" class="btn-primary">+ New Outfit</button>
+        <div style="display:flex;gap:8px">
+          <button id="btn-new-suggest" class="btn-secondary">✨ Suggest</button>
+          <button id="btn-new-outfit" class="btn-primary">+ New Outfit</button>
+        </div>
       </div>
       <div id="outfits-list" class="outfits-list"></div>
+    </section>
+
+    <!-- ── Stats View ── -->
+    <section id="view-stats" class="view">
+      <div id="stats-content"></div>
     </section>
 
     <!-- ── Add Item View ── -->
@@ -96,6 +115,16 @@
           <label>Size<input type="text" id="f-size" placeholder="optional"></label>
           <label>Brand<input type="text" id="f-brand" placeholder="optional"></label>
         </div>
+        <div class="tags-field">
+          <label>Tags</label>
+          <div class="tag-checks">
+            <label class="tag-check-label"><input type="checkbox" class="tag-check" value="casual"> Casual</label>
+            <label class="tag-check-label"><input type="checkbox" class="tag-check" value="work"> Work</label>
+            <label class="tag-check-label"><input type="checkbox" class="tag-check" value="formal"> Formal</label>
+            <label class="tag-check-label"><input type="checkbox" class="tag-check" value="gym"> Gym</label>
+            <label class="tag-check-label"><input type="checkbox" class="tag-check" value="outdoor"> Outdoor</label>
+          </div>
+        </div>
         <div class="form-actions">
           <button id="btn-save-item" class="btn-primary">Add to Closet</button>
           <button id="btn-discard" class="btn-secondary">Discard</button>
@@ -105,6 +134,39 @@
     </section>
 
   </main>
+
+  <!-- ── Suggest Outfit Modal ── -->
+  <div id="suggest-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h2>✨ Suggest an Outfit</h2>
+      <div id="suggest-occasions">
+        <p class="modal-sub">What's the occasion?</p>
+        <div class="occasion-grid">
+          <button class="occasion-btn" data-occasion="casual day">👕<br>Casual</button>
+          <button class="occasion-btn" data-occasion="work or office">💼<br>Work</button>
+          <button class="occasion-btn" data-occasion="formal event">🎩<br>Formal</button>
+          <button class="occasion-btn" data-occasion="date night">🌙<br>Date Night</button>
+          <button class="occasion-btn" data-occasion="gym workout">🏋️<br>Gym</button>
+          <button class="occasion-btn" data-occasion="outdoor activity">🌲<br>Outdoor</button>
+        </div>
+        <div class="modal-actions">
+          <button id="btn-cancel-suggest" class="btn-secondary">Cancel</button>
+        </div>
+      </div>
+      <div id="suggest-loading" class="loading hidden">Picking the perfect outfit…</div>
+      <div id="suggest-result" class="hidden">
+        <p class="suggest-name" id="suggest-outfit-name"></p>
+        <p class="suggest-reason" id="suggest-reasoning"></p>
+        <div id="suggest-items-list" class="suggest-items-list"></div>
+        <div id="suggest-save-error" class="error-msg hidden"></div>
+        <div class="modal-actions">
+          <button id="btn-save-suggestion" class="btn-primary">Save Outfit</button>
+          <button id="btn-try-again" class="btn-secondary">Try Again</button>
+          <button id="btn-cancel-suggest2" class="btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ── New Outfit Modal ── -->
   <div id="outfit-modal" class="modal-overlay hidden">

@@ -1,22 +1,15 @@
 const express = require('express');
-const fs = require('fs');
 const path = require('path');
+const { readJSON, writeJSON } = require('../services/db');
+const { suggestOutfit } = require('../services/ai');
 
 const router = express.Router();
 const OUTFITS_PATH = path.join(__dirname, '../data/outfits.json');
 const CLOSET_PATH = path.join(__dirname, '../data/closet.json');
 
-function readOutfits() {
-  return JSON.parse(fs.readFileSync(OUTFITS_PATH, 'utf8'));
-}
-
-function writeOutfits(outfits) {
-  fs.writeFileSync(OUTFITS_PATH, JSON.stringify(outfits, null, 2));
-}
-
-function readItems() {
-  return JSON.parse(fs.readFileSync(CLOSET_PATH, 'utf8'));
-}
+function readOutfits() { return readJSON(OUTFITS_PATH); }
+function writeOutfits(outfits) { writeJSON(OUTFITS_PATH, outfits); }
+function readItems() { return readJSON(CLOSET_PATH); }
 
 // Resolve item IDs to full item objects; flag any missing IDs
 function populateItems(itemIds) {
@@ -64,6 +57,22 @@ router.post('/', (req, res) => {
   outfits.push(newOutfit);
   writeOutfits(outfits);
   res.status(201).json({ ...newOutfit, items: populateItems(itemIds) });
+});
+
+// POST /outfits/suggest — Claude picks an outfit based on occasion
+router.post('/suggest', async (req, res) => {
+  const { occasion } = req.body;
+  if (!occasion) return res.status(400).json({ error: 'occasion is required' });
+  const items = readItems();
+  if (items.length < 2) return res.status(400).json({ error: 'Add more items to your closet first' });
+  try {
+    const suggestion = await suggestOutfit(items, occasion);
+    const allIds = new Set(items.map(i => i.id));
+    suggestion.itemIds = (suggestion.itemIds || []).filter(id => allIds.has(id));
+    res.json(suggestion);
+  } catch (err) {
+    res.status(500).json({ error: 'Suggestion failed', detail: err.message });
+  }
 });
 
 // PATCH /outfits/:id — rename an outfit or swap its item list

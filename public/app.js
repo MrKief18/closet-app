@@ -14,9 +14,12 @@ function catColor(cat) { return CAT_COLOR[cat] || '#6b7280'; }
 // ── State ────────────────────────────────────────────────────────────────────
 
 let currentFilter = '';
+let currentTagFilter = '';
 let selectedOutfitItems = new Set();
 let selectedPhotoFile = null;
 let identifiedImageUrl = null;
+let suggestOccasion = '';
+let suggestResult = null;
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 
@@ -25,7 +28,9 @@ document.addEventListener('DOMContentLoaded', () => {
   setupFilters();
   setupAddItem();
   setupOutfitBuilder();
+  setupSuggestModal();
   loadCloset();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
 });
 
 // ── Navigation ────────────────────────────────────────────────────────────────
@@ -39,25 +44,43 @@ function setupNav() {
 function switchView(view) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === `view-${view}`));
-  if (view === 'closet') loadCloset(currentFilter);
+  if (view === 'closet') loadCloset();
   if (view === 'outfits') loadOutfits();
+  if (view === 'stats') loadStats();
+  if (view === 'add') {
+    showPanel('panel-camera');
+    document.getElementById('btn-show-camera').classList.add('active-option');
+    document.getElementById('btn-show-search').classList.remove('active-option');
+  }
 }
 
 // ── Closet ────────────────────────────────────────────────────────────────────
 
 function setupFilters() {
-  document.querySelectorAll('.filter').forEach(btn => {
+  document.querySelectorAll('.filter[data-cat]').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.filter').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.filter[data-cat]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentFilter = btn.dataset.cat;
-      loadCloset(currentFilter);
+      loadCloset();
+    });
+  });
+
+  document.querySelectorAll('.filter[data-tag]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter[data-tag]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentTagFilter = btn.dataset.tag;
+      loadCloset();
     });
   });
 }
 
-async function loadCloset(category = '') {
-  const url = category ? `/items?category=${encodeURIComponent(category)}` : '/items';
+async function loadCloset() {
+  const params = [];
+  if (currentFilter) params.push(`category=${encodeURIComponent(currentFilter)}`);
+  if (currentTagFilter) params.push(`tag=${encodeURIComponent(currentTagFilter)}`);
+  const url = '/items' + (params.length ? '?' + params.join('&') : '');
   try {
     const items = await apiFetch(url);
     renderItemGrid('items-grid', items, false);
@@ -78,6 +101,8 @@ function renderItemGrid(containerId, items, selectable) {
     const thumb = item.imageUrl
       ? `<img class="item-img" src="${esc(item.imageUrl)}" alt="${esc(item.name)}">`
       : `<div class="item-icon" style="background:${color}22">${catIcon(item.category)}</div>`;
+    const tags = (item.tags || []).map(t => `<span class="tag-chip">${esc(t)}</span>`).join('');
+    const wearInfo = item.wearCount ? `<div class="item-wear">worn ${item.wearCount}×</div>` : '';
     return `
       <div class="item-card" data-id="${item.id}" data-category="${item.category}">
         ${thumb}
@@ -85,8 +110,13 @@ function renderItemGrid(containerId, items, selectable) {
           <div class="item-name">${esc(item.name)}</div>
           <div class="item-meta">${esc(meta)}</div>
           <span class="item-cat-badge" style="background:${color}22;color:${color}">${item.category}</span>
+          ${tags ? `<div class="item-tags">${tags}</div>` : ''}
+          ${wearInfo}
         </div>
-        ${selectable ? '' : `<button class="btn-delete" data-id="${item.id}" title="Remove">×</button>`}
+        ${selectable ? '' : `
+          <button class="btn-wear" data-id="${item.id}" title="Log as worn today">✓</button>
+          <button class="btn-delete" data-id="${item.id}" title="Remove">×</button>
+        `}
       </div>`;
   }).join('');
 
@@ -107,6 +137,9 @@ function renderItemGrid(containerId, items, selectable) {
     grid.querySelectorAll('.btn-delete').forEach(btn => {
       btn.addEventListener('click', e => { e.stopPropagation(); deleteItem(btn.dataset.id); });
     });
+    grid.querySelectorAll('.btn-wear').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); wearItem(btn.dataset.id); });
+    });
   }
 }
 
@@ -114,9 +147,19 @@ async function deleteItem(id) {
   try {
     await apiFetch(`/items/${id}`, { method: 'DELETE' });
     showToast('Item removed');
-    loadCloset(currentFilter);
+    loadCloset();
   } catch (e) {
     showToast('Failed to remove item', true);
+  }
+}
+
+async function wearItem(id) {
+  try {
+    await apiFetch(`/items/${id}/wear`, { method: 'POST' });
+    showToast('Logged as worn today!');
+    loadCloset();
+  } catch {
+    showToast('Failed to log wear', true);
   }
 }
 
@@ -219,10 +262,14 @@ function setupAddItem() {
   document.getElementById('btn-show-camera').addEventListener('click', () => {
     showPanel('panel-camera');
     resetIdentifiedForm();
+    document.getElementById('btn-show-camera').classList.add('active-option');
+    document.getElementById('btn-show-search').classList.remove('active-option');
   });
   document.getElementById('btn-show-search').addEventListener('click', () => {
     showPanel('panel-search');
     resetIdentifiedForm();
+    document.getElementById('btn-show-search').classList.add('active-option');
+    document.getElementById('btn-show-camera').classList.remove('active-option');
   });
 
   // Camera flow
@@ -337,6 +384,7 @@ function resetIdentifiedForm() {
   document.getElementById('btn-analyze').classList.add('hidden');
   document.getElementById('camera-input').value = '';
   document.getElementById('search-input').value = '';
+  document.querySelectorAll('.tag-check').forEach(cb => { cb.checked = false; });
   selectedPhotoFile = null;
   identifiedImageUrl = null;
 }
@@ -353,13 +401,15 @@ async function saveIdentifiedItem() {
     return;
   }
 
+  const tags = [...document.querySelectorAll('.tag-check:checked')].map(cb => cb.value);
   const body = {
     name,
     category: document.getElementById('f-category').value,
     color,
     size: document.getElementById('f-size').value.trim() || null,
     brand: document.getElementById('f-brand').value.trim() || null,
-    imageUrl: identifiedImageUrl || null
+    imageUrl: identifiedImageUrl || null,
+    tags
   };
 
   try {
@@ -375,6 +425,130 @@ async function saveIdentifiedItem() {
     errEl.classList.remove('hidden');
   } finally {
     document.getElementById('btn-save-item').disabled = false;
+  }
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+
+async function loadStats() {
+  try {
+    const data = await apiFetch('/stats');
+    renderStats(data);
+  } catch {
+    document.getElementById('stats-content').innerHTML = '<p class="empty-state">Failed to load stats.</p>';
+  }
+}
+
+function renderStats(d) {
+  const cats = Object.entries(d.byCategory).sort((a, b) => b[1] - a[1]);
+  const maxCat = cats[0]?.[1] || 1;
+
+  document.getElementById('stats-content').innerHTML = `
+    <div class="stat-cards">
+      <div class="stat-card"><div class="stat-num">${d.totalItems}</div><div class="stat-label">Items</div></div>
+      <div class="stat-card"><div class="stat-num">${d.totalOutfits}</div><div class="stat-label">Outfits</div></div>
+      <div class="stat-card"><div class="stat-num">${d.neverWorn}</div><div class="stat-label">Never Worn</div></div>
+      <div class="stat-card"><div class="stat-num">${d.wornThisMonth}</div><div class="stat-label">Worn This Month</div></div>
+    </div>
+    <div class="stats-panels">
+      <div class="stats-panel">
+        <h3>By Category</h3>
+        ${cats.map(([cat, count]) => `
+          <div class="cat-bar-row">
+            <span class="cat-bar-label">${cat}</span>
+            <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${Math.round(count / maxCat * 100)}%;background:${catColor(cat)}"></div></div>
+            <span class="cat-bar-count">${count}</span>
+          </div>`).join('')}
+      </div>
+      ${d.mostWorn.length ? `
+        <div class="stats-panel">
+          <h3>Most Worn</h3>
+          ${d.mostWorn.map(i => `
+            <div class="most-worn-row">
+              <span>${catIcon(i.category)}</span>
+              <span class="most-worn-name">${esc(i.name)}</span>
+              <span class="most-worn-count">${i.wearCount}×</span>
+            </div>`).join('')}
+        </div>` : ''}
+    </div>`;
+}
+
+// ── Suggest Outfit Modal ──────────────────────────────────────────────────────
+
+function setupSuggestModal() {
+  document.getElementById('btn-new-suggest').addEventListener('click', openSuggestModal);
+  document.getElementById('btn-cancel-suggest').addEventListener('click', closeSuggestModal);
+  document.getElementById('btn-cancel-suggest2').addEventListener('click', closeSuggestModal);
+  document.getElementById('btn-try-again').addEventListener('click', () => {
+    document.getElementById('suggest-result').classList.add('hidden');
+    document.getElementById('suggest-occasions').classList.remove('hidden');
+    document.getElementById('btn-cancel-suggest').closest('.modal-actions').classList.remove('hidden');
+  });
+  document.getElementById('btn-save-suggestion').addEventListener('click', saveSuggestion);
+  document.getElementById('suggest-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeSuggestModal();
+  });
+  document.querySelectorAll('.occasion-btn').forEach(btn => {
+    btn.addEventListener('click', () => requestSuggestion(btn.dataset.occasion));
+  });
+}
+
+function openSuggestModal() {
+  suggestResult = null;
+  document.getElementById('suggest-occasions').classList.remove('hidden');
+  document.getElementById('suggest-loading').classList.add('hidden');
+  document.getElementById('suggest-result').classList.add('hidden');
+  document.getElementById('suggest-modal').classList.remove('hidden');
+}
+
+function closeSuggestModal() {
+  document.getElementById('suggest-modal').classList.add('hidden');
+}
+
+async function requestSuggestion(occasion) {
+  suggestOccasion = occasion;
+  document.getElementById('suggest-occasions').classList.add('hidden');
+  document.getElementById('suggest-loading').classList.remove('hidden');
+  document.getElementById('suggest-result').classList.add('hidden');
+  document.getElementById('suggest-save-error').classList.add('hidden');
+
+  try {
+    const data = await apiFetch('/outfits/suggest', { method: 'POST', body: JSON.stringify({ occasion }) });
+    suggestResult = data;
+
+    document.getElementById('suggest-outfit-name').textContent = data.name;
+    document.getElementById('suggest-reasoning').textContent = data.reasoning || '';
+
+    const allItems = await apiFetch('/items');
+    const picked = (data.itemIds || []).map(id => allItems.find(i => i.id === id)).filter(Boolean);
+    document.getElementById('suggest-items-list').innerHTML = picked.map(i => `
+      <div class="suggest-item-row">
+        <span>${catIcon(i.category)}</span>
+        <span class="suggest-item-name">${esc(i.name)}</span>
+        <span class="item-cat-badge" style="background:${catColor(i.category)}22;color:${catColor(i.category)}">${i.category}</span>
+      </div>`).join('');
+
+    document.getElementById('suggest-loading').classList.add('hidden');
+    document.getElementById('suggest-result').classList.remove('hidden');
+  } catch {
+    document.getElementById('suggest-loading').classList.add('hidden');
+    document.getElementById('suggest-occasions').classList.remove('hidden');
+    showToast('Suggestion failed — try again', true);
+  }
+}
+
+async function saveSuggestion() {
+  if (!suggestResult) return;
+  const errEl = document.getElementById('suggest-save-error');
+  errEl.classList.add('hidden');
+  try {
+    await apiFetch('/outfits', { method: 'POST', body: JSON.stringify({ name: suggestResult.name, itemIds: suggestResult.itemIds }) });
+    closeSuggestModal();
+    showToast('Outfit saved!');
+    loadOutfits();
+  } catch (e) {
+    errEl.textContent = e.message || 'Failed to save';
+    errEl.classList.remove('hidden');
   }
 }
 

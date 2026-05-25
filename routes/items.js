@@ -1,26 +1,22 @@
 const express = require('express');
-const fs = require('fs');
 const path = require('path');
 const { searchItem, findProductImage } = require('../services/ai');
+const { readJSON, writeJSON } = require('../services/db');
 
 const router = express.Router();
 const DB_PATH = path.join(__dirname, '../data/closet.json');
 
-// Helper: read items from JSON file
-function readItems() {
-  return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
-}
+function readItems() { return readJSON(DB_PATH); }
+function writeItems(items) { writeJSON(DB_PATH, items); }
 
-// Helper: write items to JSON file
-function writeItems(items) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(items, null, 2));
-}
-
-// GET /items — list all clothing items, optional ?category= filter
+// GET /items — list all clothing items; optional ?category= and ?tag= filters
 router.get('/', (req, res) => {
   let items = readItems();
   if (req.query.category) {
     items = items.filter(i => i.category.toLowerCase() === req.query.category.toLowerCase());
+  }
+  if (req.query.tag) {
+    items = items.filter(i => (i.tags || []).includes(req.query.tag.toLowerCase()));
   }
   res.json(items);
 });
@@ -64,7 +60,7 @@ router.get('/:id', (req, res) => {
 // POST /items — add a new clothing item
 // Body: { name, category, color, size, brand? }
 router.post('/', (req, res) => {
-  const { name, category, color, size, brand, imageUrl } = req.body;
+  const { name, category, color, size, brand, imageUrl, tags } = req.body;
   if (!name || !category || !color || !size) {
     return res.status(400).json({ error: 'name, category, color, and size are required' });
   }
@@ -77,6 +73,9 @@ router.post('/', (req, res) => {
     size,
     brand: brand || null,
     imageUrl: imageUrl || null,
+    tags: Array.isArray(tags) ? tags : [],
+    wearCount: 0,
+    lastWorn: null,
     addedAt: new Date().toISOString()
   };
   items.push(newItem);
@@ -89,10 +88,21 @@ router.patch('/:id', (req, res) => {
   const items = readItems();
   const idx = items.findIndex(i => i.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Item not found' });
-  const allowed = ['name', 'category', 'color', 'size', 'brand', 'imageUrl'];
+  const allowed = ['name', 'category', 'color', 'size', 'brand', 'imageUrl', 'tags'];
   allowed.forEach(field => {
     if (req.body[field] !== undefined) items[idx][field] = req.body[field];
   });
+  writeItems(items);
+  res.json(items[idx]);
+});
+
+// POST /items/:id/wear — log the item as worn today
+router.post('/:id/wear', (req, res) => {
+  const items = readItems();
+  const idx = items.findIndex(i => i.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Item not found' });
+  items[idx].wearCount = (items[idx].wearCount || 0) + 1;
+  items[idx].lastWorn = new Date().toISOString();
   writeItems(items);
   res.json(items[idx]);
 });

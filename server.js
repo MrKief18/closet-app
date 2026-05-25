@@ -4,6 +4,7 @@ const path = require('path');
 const itemsRouter = require('./routes/items');
 const outfitsRouter = require('./routes/outfits');
 const uploadRouter = require('./routes/upload');
+const statsRouter = require('./routes/stats');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,6 +23,9 @@ app.use('/outfits', outfitsRouter);
 
 // Mount camera/image upload route (Claude Vision analysis)
 app.use('/upload', uploadRouter);
+
+// Mount wardrobe analytics route
+app.use('/stats', statsRouter);
 
 
 app.listen(PORT, () => {

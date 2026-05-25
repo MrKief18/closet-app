@@ -78,4 +78,29 @@ async function findProductImage(details) {
   }
 }
 
-module.exports = { analyzeImage, searchItem, findProductImage };
+// Ask Claude to pick a complete outfit from the user's wardrobe for a given occasion
+async function suggestOutfit(items, occasion) {
+  const wardrobe = items.map(i => ({
+    id: i.id, name: i.name, category: i.category,
+    color: i.color, brand: i.brand || null, tags: i.tags || []
+  }));
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 512,
+    messages: [{
+      role: 'user',
+      content: `You are a personal stylist. Choose a complete outfit from this wardrobe for: "${occasion}".
+
+Wardrobe: ${JSON.stringify(wardrobe)}
+
+Rules: pick one item per category needed, only use IDs listed above.
+Respond ONLY with valid JSON (no markdown):
+{"name":"outfit name","itemIds":["id1","id2"],"reasoning":"one sentence"}`
+    }]
+  });
+
+  return JSON.parse(response.content[0].text);
+}
+
+module.exports = { analyzeImage, searchItem, findProductImage, suggestOutfit };
