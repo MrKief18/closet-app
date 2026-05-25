@@ -43,7 +43,30 @@ router.get('/', (req, res) => {
     Object.entries(wearLogMap).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 60)
   );
 
-  res.json({ totalItems: items.length, totalOutfits: outfits.length, byCategory, byColor, neverWorn, wornThisMonth, mostWorn, wearLog });
+  // Build outfit wear log: group outfit wear events by date with full item details
+  const outfitWearLogMap = {};
+  for (const outfit of outfits) {
+    for (const event of (outfit.wearEvents || [])) {
+      if (!outfitWearLogMap[event.date]) outfitWearLogMap[event.date] = [];
+      outfitWearLogMap[event.date].push({
+        outfitId: outfit.id,
+        outfitName: outfit.name,
+        timestamp: event.timestamp,
+        items: (event.itemIds || []).map(id => {
+          const item = items.find(i => i.id === id);
+          return item ? { id: item.id, name: item.name, category: item.category, imageUrl: item.imageUrl || null } : null;
+        }).filter(Boolean)
+      });
+    }
+  }
+  for (const date of Object.keys(outfitWearLogMap)) {
+    outfitWearLogMap[date].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  }
+  const outfitWearLog = Object.fromEntries(
+    Object.entries(outfitWearLogMap).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 60)
+  );
+
+  res.json({ totalItems: items.length, totalOutfits: outfits.length, byCategory, byColor, neverWorn, wornThisMonth, mostWorn, wearLog, outfitWearLog });
 });
 
 // GET /stats/gaps — AI-powered wardrobe gap analysis

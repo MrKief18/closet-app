@@ -750,12 +750,16 @@ async function loadOutfits() {
         <div class="outfit-card" data-id="${o.id}">
           <div class="outfit-image-strip">${strip || '<div class="outfit-strip-icon" style="background:var(--surface2);flex:1">👔</div>'}</div>
           <div class="outfit-card-body">
-            <span class="outfit-name">${esc(o.name)}</span>
-            <span class="outfit-item-count">${(o.items || []).length} items</span>
-            ${avgBadge}
-            <div class="outfit-card-actions">
-              <button class="btn-wear-outfit" data-id="${o.id}" title="Log all items as worn today">✓ Wore This</button>
-              <button class="btn-delete-outfit" data-id="${o.id}" title="Delete">×</button>
+            <div class="outfit-card-top">
+              <span class="outfit-name">${esc(o.name)}</span>
+              <span class="outfit-item-count">${(o.items || []).length} items</span>
+            </div>
+            <div class="outfit-card-bottom">
+              ${avgBadge}
+              <div class="outfit-card-actions">
+                <button class="btn-wear-outfit" data-id="${o.id}" title="Log all items as worn today">✓ Wore This</button>
+                <button class="btn-delete-outfit" data-id="${o.id}" title="Delete">×</button>
+              </div>
             </div>
           </div>
         </div>`;
@@ -1259,6 +1263,7 @@ async function loadStats() {
 // ── Calendar state ────────────────────────────────────────────────────────────
 
 let _calWearLog = {};
+let _calOutfitWearLog = {};
 let _calYear  = new Date().getFullYear();
 let _calMonth = new Date().getMonth(); // 0-based
 
@@ -1327,6 +1332,7 @@ function renderStats(d) {
 
   // Initialise calendar
   _calWearLog = d.wearLog || {};
+  _calOutfitWearLog = d.outfitWearLog || {};
   _calYear  = new Date().getFullYear();
   _calMonth = new Date().getMonth();
   renderCalendar();
@@ -1392,12 +1398,14 @@ function renderCalendar() {
   for (let i = 0; i < firstDay; i++) cells += `<div class="cal-cell cal-blank"></div>`;
   for (let day = 1; day <= daysInMonth; day++) {
     const dateStr = `${_calYear}-${String(_calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    const hasWear = !!_calWearLog[dateStr];
-    const isToday = dateStr === today;
+    const hasOutfits = !!_calOutfitWearLog[dateStr]?.length;
+    const hasItems   = !!_calWearLog[dateStr]?.length;
+    const hasWear    = hasOutfits || hasItems;
+    const isToday    = dateStr === today;
     cells += `<div class="cal-cell${hasWear ? ' cal-has-wear' : ''}${isToday ? ' cal-today' : ''}"
       data-date="${dateStr}" role="button" tabindex="${hasWear ? 0 : -1}">
       <span class="cal-day-num">${day}</span>
-      ${hasWear ? `<span class="cal-dot"></span>` : ''}
+      ${hasOutfits ? `<span class="cal-dot cal-dot-outfit"></span>` : hasItems ? `<span class="cal-dot"></span>` : ''}
     </div>`;
   }
 
@@ -1429,33 +1437,63 @@ function renderCalendar() {
 }
 
 function showCalendarDay(dateStr) {
-  // Highlight selected
   document.querySelectorAll('.cal-cell').forEach(c => c.classList.toggle('cal-selected', c.dataset.date === dateStr));
 
-  const items = _calWearLog[dateStr] || [];
+  const outfitSets     = _calOutfitWearLog[dateStr] || [];
+  const individualItems = _calWearLog[dateStr] || [];
   const d = new Date(dateStr + 'T12:00:00');
   const label = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
-  // Capture item IDs in the closure so the async handler always uses this day's IDs
-  const wornIds = items.map(it => it.id);
+  // Standalone items are those not accounted for in any outfit worn that day
+  const outfitItemIds  = new Set(outfitSets.flatMap(s => s.items.map(i => i.id)));
+  const standaloneItems = individualItems.filter(it => !outfitItemIds.has(it.id));
+  const wornIds = [...new Set([...outfitItemIds, ...individualItems.map(i => i.id)])];
+
+  let html = `<div class="cal-detail-date">${esc(label)}</div>`;
+
+  if (outfitSets.length) {
+    html += `<div class="cal-outfit-sets">`;
+    for (const set of outfitSets) {
+      const timeStr = new Date(set.timestamp).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+      const strip = set.items.map(i =>
+        i.imageUrl
+          ? `<img class="cal-outfit-strip-img" src="${esc(i.imageUrl)}" alt="${esc(i.name)}" onerror="this.style.display='none'">`
+          : `<div class="cal-outfit-strip-icon">${catIcon(i.category)}</div>`
+      ).join('');
+      html += `
+        <div class="cal-outfit-set">
+          <div class="cal-outfit-set-header">
+            <span class="cal-outfit-set-name">${esc(set.outfitName)}</span>
+            <span class="cal-outfit-time">${esc(timeStr)}</span>
+          </div>
+          <div class="cal-outfit-strip">${strip}</div>
+        </div>`;
+    }
+    html += `</div>`;
+  }
+
+  if (standaloneItems.length) {
+    if (outfitSets.length) html += `<div class="cal-section-divider">Individual Items</div>`;
+    html += `<div class="wear-log-items">`;
+    html += standaloneItems.map(it => `
+      <div class="wear-log-item">
+        ${it.imageUrl
+          ? `<img src="${esc(it.imageUrl)}" class="wear-log-thumb" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+          : ''}
+        <div class="wear-log-icon" style="${it.imageUrl ? 'display:none' : ''}">${catIcon(it.category)}</div>
+        <span class="wear-log-name">${esc(it.name)}</span>
+      </div>`).join('');
+    html += `</div>`;
+  }
+
+  if (wornIds.length) {
+    html += `<button class="btn-wear-again" data-date="${esc(dateStr)}">&#8635; Wear Again</button>`;
+  }
 
   const el = document.getElementById('calendar-day-detail');
-  el.innerHTML = `
-    <div class="cal-detail-date">${esc(label)}</div>
-    <div class="wear-log-items">
-      ${items.map(it => `
-        <div class="wear-log-item">
-          ${it.imageUrl
-            ? `<img src="${esc(it.imageUrl)}" class="wear-log-thumb" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-            : ''}
-          <div class="wear-log-icon" style="${it.imageUrl ? 'display:none' : ''}">${catIcon(it.category)}</div>
-          <span class="wear-log-name">${esc(it.name)}</span>
-        </div>`).join('')}
-    </div>
-    ${wornIds.length ? `<button class="btn-wear-again" data-date="${esc(dateStr)}">&#8635; Wear Again</button>` : ''}`;
+  el.innerHTML = html;
   el.classList.remove('hidden');
 
-  // Wire up Wear Again — logs all items from that day as worn today, then refreshes stats
   const wearAgainBtn = el.querySelector('.btn-wear-again');
   if (wearAgainBtn) {
     wearAgainBtn.addEventListener('click', async () => {

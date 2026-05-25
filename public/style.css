@@ -371,7 +371,7 @@ main { padding: 28px; max-width: 1040px; margin: 0 auto; }
 .outfit-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: var(--border2); }
 
 .outfit-image-strip {
-  height: 120px;
+  height: 136px;
   display: flex;
   overflow: hidden;
   position: relative;
@@ -389,14 +389,16 @@ main { padding: 28px; max-width: 1040px; margin: 0 auto; }
 }
 
 .outfit-card-body {
-  padding: 14px 16px;
+  padding: 12px 14px;
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
 }
+.outfit-card-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .outfit-name { font-weight: 600; font-size: 14px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.outfit-item-count { font-size: 12px; color: var(--text2); flex-shrink: 0; }
-.outfit-card-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.outfit-item-count { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.outfit-card-bottom { display: flex; align-items: center; gap: 8px; }
+.outfit-card-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-shrink: 0; }
 .btn-wear-outfit {
   background: var(--blue)18; border: 1px solid var(--blue)44;
   color: var(--blue); font-size: 12px; font-weight: 600;
@@ -971,10 +973,13 @@ main { padding: 28px; max-width: 1040px; margin: 0 auto; }
 .stat-card {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-top: 2px solid var(--blue);
   border-radius: var(--radius-lg);
-  padding: 26px 20px;
+  padding: 24px 20px;
   text-align: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
 .stat-num { font-size: 38px; font-weight: 800; color: var(--blue); letter-spacing: -1px; }
 .stat-label { font-size: 11px; color: var(--text2); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.6px; }
 
@@ -1012,7 +1017,7 @@ main { padding: 28px; max-width: 1040px; margin: 0 auto; }
 .cal-nav:hover { background: var(--surface3); }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .cal-weekday { font-size: 10px; font-weight: 600; color: var(--muted); text-align: center; text-transform: uppercase; padding: 4px 0 8px; }
-.cal-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 46px; border-radius: var(--radius-sm); border: 1px solid transparent; font-size: 13px; color: var(--text2); transition: background 0.15s, border-color 0.15s; }
+.cal-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 50px; border-radius: var(--radius-sm); border: 1px solid transparent; font-size: 13px; color: var(--text2); transition: background 0.15s, border-color 0.15s; }
 .cal-cell.cal-blank { pointer-events: none; }
 .cal-cell.cal-has-wear { cursor: pointer; color: var(--text); background: var(--surface2); border-color: var(--border); }
 .cal-cell.cal-has-wear:hover { background: var(--surface3); border-color: var(--border2); }
@@ -1188,6 +1193,66 @@ main { padding: 28px; max-width: 1040px; margin: 0 auto; }
 
 /* Average rating badge shown in outfit card body */
 .outfit-avg-rating { font-size: 11px; color: #fbbf24; flex-shrink: 0; }
+
+/* ── Calendar Outfit Sets ── */
+.cal-outfit-sets { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.cal-outfit-set {
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.cal-outfit-set-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 8px;
+}
+.cal-outfit-set-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.cal-outfit-time { font-size: 11px; color: var(--muted); }
+.cal-outfit-strip {
+  display: flex;
+  height: 88px;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+}
+.cal-outfit-strip-img {
+  flex: 1;
+  object-fit: cover;
+  min-width: 0;
+  transition: transform 0.3s ease;
+}
+.cal-outfit-set:hover .cal-outfit-strip-img { transform: scale(1.04); }
+.cal-outfit-strip-icon {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  background: var(--surface2);
+  min-width: 0;
+}
+.cal-section-divider {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 14px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cal-section-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* Outfit dot is slightly different color from item-only dot */
+.cal-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--blue); }
+.cal-dot.cal-dot-outfit { background: var(--indigo); width: 6px; height: 6px; }
 
 /* ── Wear Again button (Stats — calendar day detail) ── */
 .btn-wear-again {

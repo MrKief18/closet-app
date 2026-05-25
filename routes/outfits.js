@@ -109,8 +109,9 @@ router.patch('/:id', (req, res) => {
 // POST /outfits/:id/wear — log every item in the outfit as worn today
 router.post('/:id/wear', (req, res) => {
   const outfits = readOutfits();
-  const outfit = outfits.find(o => o.id === req.params.id);
-  if (!outfit) return res.status(404).json({ error: 'Outfit not found' });
+  const outfitIdx = outfits.findIndex(o => o.id === req.params.id);
+  if (outfitIdx === -1) return res.status(404).json({ error: 'Outfit not found' });
+  const outfit = outfits[outfitIdx];
 
   const items = readItems();
   const now = new Date();
@@ -127,6 +128,12 @@ router.post('/:id/wear', (req, res) => {
     wornCount++;
   }
   writeJSON(CLOSET_PATH, items);
+
+  // Record the outfit wear event with full timestamp for calendar display
+  if (!Array.isArray(outfit.wearEvents)) outfit.wearEvents = [];
+  outfit.wearEvents.push({ timestamp: now.toISOString(), date: localDate, itemIds: [...outfit.itemIds] });
+  writeOutfits(outfits);
+
   res.json({ wornCount });
 });
 
