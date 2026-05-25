@@ -79,61 +79,29 @@ async function searchItem(query) {
   return JSON.parse(response.content[0].text);
 }
 
-// Find a real product photo. Priority: Google → Bing → Unsplash. Returns null if none configured.
+// Find a real product photo. Priority: SerpAPI (Google Images) → Unsplash fallback.
 async function findProductImage(details) {
   // Tightest possible query: brand + product name + color
   const q = [details.brand, details.name, details.color]
     .filter(Boolean)
     .join(' ');
 
-  // ── Google Custom Search (service account OAuth or API key) ─────────────────
-  const googleCx = process.env.GOOGLE_CSE_ID;
-  if (googleCx) {
-    // Prefer service account auth; fall back to API key if set
-    const jwt = getGoogleJwt();
-    const googleKey = process.env.GOOGLE_API_KEY;
-    if (jwt || googleKey) {
-      try {
-        const baseUrl = `https://www.googleapis.com/customsearch/v1` +
-          `?cx=${googleCx}` +
-          `&q=${encodeURIComponent(q + ' product')}&searchType=image` +
-          `&num=1&imgType=photo&safe=active&imgSize=medium`;
-        let headers = {};
-        let url = baseUrl;
-        if (jwt) {
-          const { token } = await jwt.getAccessToken();
-          headers = { 'Authorization': `Bearer ${token}` };
-        } else {
-          url = baseUrl + `&key=${googleKey}`;
-        }
-        const res = await fetch(url, { headers });
-        if (res.ok) {
-          const data = await res.json();
-          const link = data.items?.[0]?.link;
-          if (link) return link;
-        }
-      } catch {}
-    }
-  }
-
-  // ── Bing Image Search (best free alternative for real product images) ────────
-  const bingKey = process.env.BING_API_KEY;
-  if (bingKey) {
+  // ── SerpAPI — real Google Images results ─────────────────────────────────────
+  const serpKey = process.env.SERPAPI_KEY;
+  if (serpKey) {
     try {
-      const url = `https://api.bing.microsoft.com/v7.0/images/search` +
-        `?q=${encodeURIComponent(q + ' product photo')}&count=1&safeSearch=Moderate&imageType=Photo`;
-      const res = await fetch(url, {
-        headers: { 'Ocp-Apim-Subscription-Key': bingKey }
-      });
+      const url = `https://serpapi.com/search.json` +
+        `?engine=google_images&q=${encodeURIComponent(q + ' product')}&num=1&api_key=${serpKey}`;
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        const link = data.value?.[0]?.thumbnailUrl || data.value?.[0]?.contentUrl;
+        const link = data.images_results?.[0]?.original || data.images_results?.[0]?.thumbnail;
         if (link) return link;
       }
     } catch {}
   }
 
-  // ── Unsplash fallback (lifestyle/editorial, less accurate) ───────────────────
+  // ── Unsplash fallback ────────────────────────────────────────────────────────
   const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
   if (unsplashKey) {
     try {
