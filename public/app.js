@@ -1554,6 +1554,70 @@ async function saveSuggestion() {
   }
 }
 
+// ── Weather Widget ────────────────────────────────────────────────────────────
+
+// Map weather condition names to display emojis
+const CONDITION_ICON = { sunny: '☀️', cloudy: '☁️', foggy: '🌫️', rainy: '🌧️', snowy: '❄️', stormy: '⛈️' };
+
+function initWeatherWidget() {
+  // Only show the widget if the browser supports geolocation
+  if (!navigator.geolocation) return;
+
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const { latitude: lat, longitude: lon } = pos.coords;
+
+    // Geolocation granted — reveal the widget
+    const widget = document.getElementById('weather-widget');
+    widget.classList.remove('hidden');
+
+    // Fetch weather just for display (temp + condition label)
+    try {
+      const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode&temperature_unit=fahrenheit`);
+      const d = await r.json();
+      const temp = Math.round(d.current.temperature_2m);
+      const code = d.current.weathercode;
+      // Same code mapping used on the backend
+      const codeMap = {
+        sunny: [0, 1], cloudy: [2, 3], foggy: [45, 48],
+        rainy: [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82],
+        snowy: [71, 73, 75, 77, 85, 86], stormy: [95, 96, 99]
+      };
+      let condition = 'cloudy';
+      for (const [name, codes] of Object.entries(codeMap)) {
+        if (codes.includes(code)) { condition = name; break; }
+      }
+
+      document.getElementById('weather-icon').textContent = CONDITION_ICON[condition] || '🌤️';
+      document.getElementById('weather-desc').textContent = `${temp}°F · ${condition.charAt(0).toUpperCase() + condition.slice(1)}`;
+
+      // Wire up the "Today's Pick" button using the stored lat/lon
+      document.getElementById('btn-weather-suggest').addEventListener('click', async () => {
+        document.getElementById('weather-result').classList.add('hidden');
+        document.getElementById('weather-loading').classList.remove('hidden');
+        try {
+          const data = await apiFetch('/weather/suggest', { method: 'POST', body: JSON.stringify({ lat, lon }) });
+          const s = data.suggestion;
+          document.getElementById('weather-outfit-name').textContent = s.name;
+          document.getElementById('weather-reasoning').textContent = s.reasoning;
+
+          // Fetch full item list to build thumbnail chips
+          const allItems = await apiFetch('/items');
+          const outfitItems = (s.itemIds || []).map(id => allItems.find(i => i.id === id)).filter(Boolean);
+          document.getElementById('weather-items').innerHTML = outfitItems.map(i =>
+            `<div class="weather-item-chip">${i.imageUrl ? `<img src="${esc(i.imageUrl)}" style="width:24px;height:24px;object-fit:cover;border-radius:4px">` : catIcon(i.category)} ${esc(i.name)}</div>`
+          ).join('');
+
+          document.getElementById('weather-result').classList.remove('hidden');
+        } catch {
+          showToast('Weather suggestion failed', true);
+        } finally {
+          document.getElementById('weather-loading').classList.add('hidden');
+        }
+      });
+    } catch {} // silently ignore weather fetch failures
+  }, () => {}); // silently ignore geolocation denial
+}
+
 // ── API helper ────────────────────────────────────────────────────────────────
 
 async function apiFetch(url, options = {}) {
