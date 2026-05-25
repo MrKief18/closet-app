@@ -57,23 +57,22 @@ async function searchItem(query) {
   return JSON.parse(response.content[0].text);
 }
 
-// Search Google Custom Search Image API for a real product photo.
-// Requires GOOGLE_API_KEY and GOOGLE_CSE_ID in .env — returns null if not configured.
+// Search Unsplash for a real clothing photo.
+// Requires UNSPLASH_ACCESS_KEY in .env — returns null if not configured.
 async function findProductImage(details) {
-  const key = process.env.GOOGLE_API_KEY;
-  const cx = process.env.GOOGLE_CSE_ID;
-  if (!key || !cx) return null;
+  const key = process.env.UNSPLASH_ACCESS_KEY;
+  if (!key) return null;
 
   const q = [details.brand, details.name, details.color, details.category]
     .filter(Boolean)
     .join(' ');
 
   try {
-    const url = `https://www.googleapis.com/customsearch/v1?key=${key}&cx=${cx}&q=${encodeURIComponent(q)}&searchType=image&num=1&safe=active&imgType=photo`;
+    const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(q)}&per_page=1&client_id=${key}`;
     const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();
-    return data.items?.[0]?.link || null;
+    return data.results?.[0]?.urls?.small || null;
   } catch {
     return null;
   }
