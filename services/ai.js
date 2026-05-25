@@ -1,6 +1,26 @@
 const Anthropic = require('@anthropic-ai/sdk');
+const { JWT } = require('google-auth-library');
+const path = require('path');
+const fs = require('fs');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Cache the Google JWT client so we don't reload the key on every request
+let _googleJwt = null;
+function getGoogleJwt() {
+  if (_googleJwt) return _googleJwt;
+  const keyFile = path.join(__dirname, '../config/google-service-account.json');
+  if (!fs.existsSync(keyFile)) return null;
+  try {
+    const keys = JSON.parse(fs.readFileSync(keyFile, 'utf8'));
+    _googleJwt = new JWT({
+      email: keys.client_email,
+      key: keys.private_key,
+      scopes: ['https://www.googleapis.com/auth/cse']
+    });
+    return _googleJwt;
+  } catch { return null; }
+}
 
 // Cached system prompt — same for both image analysis and text search
 const SYSTEM_PROMPT = {
@@ -66,22 +86,34 @@ async function findProductImage(details) {
     .filter(Boolean)
     .join(' ');
 
-  // ── Google Custom Search ─────────────────────────────────────────────────────
-  const googleKey = process.env.GOOGLE_API_KEY;
-  const googleCx  = process.env.GOOGLE_CSE_ID;
-  if (googleKey && googleCx) {
-    try {
-      const url = `https://www.googleapis.com/customsearch/v1` +
-        `?key=${googleKey}&cx=${googleCx}` +
-        `&q=${encodeURIComponent(q + ' product')}&searchType=image` +
-        `&num=1&imgType=photo&safe=active&imgSize=medium`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        const link = data.items?.[0]?.link;
-        if (link) return link;
-      }
-    } catch {}
+  // ── Google Custom Search (service account OAuth or API key) ─────────────────
+  const googleCx = process.env.GOOGLE_CSE_ID;
+  if (googleCx) {
+    // Prefer service account auth; fall back to API key if set
+    const jwt = getGoogleJwt();
+    const googleKey = process.env.GOOGLE_API_KEY;
+    if (jwt || googleKey) {
+      try {
+        const baseUrl = `https://www.googleapis.com/customsearch/v1` +
+          `?cx=${googleCx}` +
+          `&q=${encodeURIComponent(q + ' product')}&searchType=image` +
+          `&num=1&imgType=photo&safe=active&imgSize=medium`;
+        let headers = {};
+        let url = baseUrl;
+        if (jwt) {
+          const { token } = await jwt.getAccessToken();
+          headers = { 'Authorization': `Bearer ${token}` };
+        } else {
+          url = baseUrl + `&key=${googleKey}`;
+        }
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const link = data.items?.[0]?.link;
+          if (link) return link;
+        }
+      } catch {}
+    }
   }
 
   // ── Bing Image Search (best free alternative for real product images) ────────
