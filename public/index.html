@@ -6,6 +6,9 @@
   <meta name="theme-color" content="#60a5fa">
   <title>Closet App</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&family=Press+Start+2P&family=VT323:wght@400&display=swap" rel="stylesheet">
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
 </head>
@@ -18,6 +21,7 @@
       <button class="tab" data-view="outfits">Outfits</button>
       <button class="tab" data-view="stats">Stats</button>
       <button class="tab" data-view="add">+ Add Item</button>
+      <button class="tab" data-view="dress">👗 Dress Me</button>
     </nav>
   </header>
 
@@ -25,6 +29,12 @@
 
     <!-- ── Closet View ── -->
     <section id="view-closet" class="view active">
+      <div class="view-header">
+        <h1 class="view-title">My Closet</h1>
+        <button class="icon-btn" id="btn-sort-open" aria-label="Sort">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>
+        </button>
+      </div>
       <!-- Weather-aware daily outfit widget -->
       <div id="weather-widget" class="weather-widget hidden">
         <div class="weather-info">
@@ -89,23 +99,34 @@
 
     <!-- ── Outfits View ── -->
     <section id="view-outfits" class="view">
-      <div class="section-header">
-        <h2>Saved Outfits</h2>
-        <div style="display:flex;gap:8px">
-          <button id="btn-new-suggest" class="btn-secondary">✨ Suggest</button>
-          <button id="btn-new-outfit" class="btn-primary">+ New Outfit</button>
+      <div class="view-header">
+        <h1 class="view-title">Outfits</h1>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="btn-new-suggest" class="icon-btn" title="AI Suggest" aria-label="Suggest outfit">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </button>
+          <button id="btn-new-outfit" class="icon-btn" title="New Outfit" aria-label="New outfit">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
         </div>
       </div>
       <div id="outfits-list" class="outfits-list"></div>
+      <button class="fab" id="btn-fab-new-outfit" aria-label="New outfit">＋</button>
     </section>
 
     <!-- ── Stats View ── -->
     <section id="view-stats" class="view">
+      <div class="view-header">
+        <h1 class="view-title">Stats</h1>
+      </div>
       <div id="stats-content"></div>
     </section>
 
     <!-- ── Add Item View ── -->
     <section id="view-add" class="view">
+      <div class="view-header">
+        <h1 class="view-title">Add Item</h1>
+      </div>
       <div class="add-options">
         <button class="add-option-btn" id="btn-show-camera">
           <span class="option-icon">📷</span>
@@ -187,6 +208,98 @@
         </div>
         <div id="save-error" class="error-msg hidden"></div>
       </div>
+    </section>
+
+    <!-- ── Dress Me (Clueless Closet) View ── -->
+    <section id="view-dress" class="view clueless-view">
+      <div class="clueless-frame">
+        <!-- Windows-style title bar -->
+        <div class="win-titlebar">
+          <span class="win-title-text">CHER'S CLOSET &nbsp;·&nbsp; FALL FASHIONS</span>
+          <div class="win-titlebar-btns">
+            <span class="win-btn-sm">▼</span>
+            <span class="win-btn-sm">▲</span>
+            <span class="win-btn-sm win-btn-close">✕</span>
+          </div>
+        </div>
+
+        <!-- Main body -->
+        <div class="clueless-body">
+
+          <!-- Left panel: item browser -->
+          <div class="clueless-left">
+            <div class="win-panel-label">AVAILABLE ITEMS</div>
+            <div id="dress-item-browser" class="dress-item-browser"></div>
+          </div>
+
+          <!-- Center: character + controls -->
+          <div class="clueless-center">
+
+            <!-- Top action buttons -->
+            <div class="dress-action-row">
+              <button id="btn-dress-me" class="win-action-btn win-btn-cyan">DRESS ME</button>
+              <button id="btn-auto-dress" class="win-action-btn win-btn-pink">AUTO DRESS</button>
+            </div>
+
+            <!-- Verdict banner (hidden until verdict arrives) -->
+            <div id="dress-verdict" class="dress-verdict hidden">
+              <span id="dress-verdict-text" class="dress-verdict-text"></span>
+              <span id="dress-verdict-reason" class="dress-verdict-reason"></span>
+            </div>
+
+            <!-- Character silhouette with layered clothing slots -->
+            <div class="character-frame">
+              <div class="character-wrap" id="character-wrap">
+                <svg class="character-svg" viewBox="0 0 200 420" xmlns="http://www.w3.org/2000/svg">
+                  <!-- head -->
+                  <circle cx="100" cy="44" r="30" fill="#d4a574" stroke="#555" stroke-width="2"/>
+                  <!-- hair suggestion -->
+                  <path d="M72 34 Q100 10 128 34" fill="#8B5E3C" stroke="none"/>
+                  <!-- neck -->
+                  <rect x="91" y="72" width="18" height="14" fill="#d4a574"/>
+                  <!-- torso -->
+                  <path d="M62 86 L138 86 L144 210 L56 210 Z" fill="#c0c0c0" stroke="#555" stroke-width="1.5"/>
+                  <!-- left arm -->
+                  <path d="M64 94 L32 186 L44 190 L72 106 Z" fill="#d4a574" stroke="#555" stroke-width="1.5"/>
+                  <!-- right arm -->
+                  <path d="M136 94 L168 186 L156 190 L128 106 Z" fill="#d4a574" stroke="#555" stroke-width="1.5"/>
+                  <!-- legs -->
+                  <path d="M72 208 L78 355 L96 355 L100 235 L104 355 L122 355 L128 208 Z" fill="#aaa" stroke="#555" stroke-width="1.5"/>
+                  <!-- feet -->
+                  <ellipse cx="85" cy="359" rx="17" ry="9" fill="#888" stroke="#555" stroke-width="1"/>
+                  <ellipse cx="115" cy="359" rx="17" ry="9" fill="#888" stroke="#555" stroke-width="1"/>
+                </svg>
+
+                <!-- Clothing overlay layers — lower z-index = drawn first -->
+                <div class="outfit-layer layer-shoes"      id="layer-shoes"      data-slot="shoes"></div>
+                <div class="outfit-layer layer-bottoms"    id="layer-bottoms"    data-slot="bottoms"></div>
+                <div class="outfit-layer layer-tops"       id="layer-tops"       data-slot="tops"></div>
+                <div class="outfit-layer layer-outerwear"  id="layer-outerwear"  data-slot="outerwear"></div>
+                <div class="outfit-layer layer-accessories" id="layer-accessories" data-slot="accessories"></div>
+              </div>
+            </div>
+
+            <!-- Bottom action buttons -->
+            <div class="dress-bottom-row">
+              <button id="btn-dress-log"   class="win-action-btn win-btn-gray">LOG WEAR</button>
+              <button id="btn-dress-save"  class="win-action-btn win-btn-gray">SAVE OUTFIT</button>
+              <button id="btn-dress-clear" class="win-action-btn win-btn-gray">CLEAR</button>
+            </div>
+          </div>
+
+        </div><!-- end .clueless-body -->
+
+        <!-- Category tab strip -->
+        <div class="clueless-tabs">
+          <button class="clueless-tab active" data-dresscat="">ALL</button>
+          <button class="clueless-tab" data-dresscat="shoes">SHOES</button>
+          <button class="clueless-tab" data-dresscat="accessories">JEWELRY</button>
+          <button class="clueless-tab" data-dresscat="tops">SWEATERS</button>
+          <button class="clueless-tab" data-dresscat="bottoms">PANTS</button>
+          <button class="clueless-tab" data-dresscat="outerwear">OUTERWEAR</button>
+        </div>
+
+      </div><!-- end .clueless-frame -->
     </section>
 
   </main>
@@ -378,22 +491,44 @@
   <!-- ── Bottom Nav (mobile only) ── -->
   <nav class="bottom-nav" id="bottom-nav">
     <button class="bottom-nav-item active" data-view="closet">
-      <span class="bottom-nav-icon">👕</span>
+      <svg class="bottom-nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.57a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.57a2 2 0 00-1.34-2.23z"/></svg>
       <span class="bottom-nav-label">Closet</span>
     </button>
     <button class="bottom-nav-item" data-view="outfits">
-      <span class="bottom-nav-icon">👔</span>
+      <svg class="bottom-nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
       <span class="bottom-nav-label">Outfits</span>
     </button>
     <button class="bottom-nav-item" data-view="stats">
-      <span class="bottom-nav-icon">📊</span>
+      <svg class="bottom-nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       <span class="bottom-nav-label">Stats</span>
     </button>
     <button class="bottom-nav-item" data-view="add">
-      <span class="bottom-nav-icon">＋</span>
+      <svg class="bottom-nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
       <span class="bottom-nav-label">Add</span>
     </button>
+    <button class="bottom-nav-item" data-view="dress">
+      <svg class="bottom-nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.57a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.57a2 2 0 00-1.34-2.23z"/><circle cx="12" cy="7" r="1" fill="currentColor"/></svg>
+      <span class="bottom-nav-label">Dress Me</span>
+    </button>
   </nav>
+
+  <!-- ── Sheet overlay ── -->
+  <div class="sheet-overlay hidden" id="sheet-overlay"></div>
+
+  <!-- ── Sort Bottom Sheet ── -->
+  <div class="bottom-sheet hidden" id="sheet-sort">
+    <div class="sheet-handle"></div>
+    <div class="sheet-body">
+      <h3 class="sheet-title">Sort By</h3>
+      <div class="sort-options">
+        <button class="sort-option" data-sort="newest">Newest First</button>
+        <button class="sort-option" data-sort="oldest">Oldest First</button>
+        <button class="sort-option" data-sort="name">Name A–Z</button>
+        <button class="sort-option" data-sort="worn">Most Worn</button>
+        <button class="sort-option" data-sort="never">Never Worn</button>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

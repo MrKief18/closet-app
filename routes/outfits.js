@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const { readJSON, writeJSON } = require('../services/db');
-const { suggestOutfit } = require('../services/ai');
+const { suggestOutfit, verdictOutfit } = require('../services/ai');
 
 const router = express.Router();
 const OUTFITS_PATH = path.join(__dirname, '../data/outfits.json');
@@ -82,6 +82,24 @@ router.post('/suggest', async (req, res) => {
   }
 });
 
+// POST /outfits/verdict — Claude judges whether the selected items make a good outfit
+// Body: { itemIds: ["id1", "id2", ...] }
+router.post('/verdict', async (req, res) => {
+  const { itemIds } = req.body;
+  if (!Array.isArray(itemIds) || itemIds.length < 2) {
+    return res.status(400).json({ error: 'Send at least 2 itemIds' });
+  }
+  const allItems = readItems();
+  const items = itemIds.map(id => allItems.find(i => i.id === id)).filter(Boolean);
+  if (items.length < 2) return res.status(400).json({ error: 'Items not found' });
+  try {
+    const result = await verdictOutfit(items);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'Verdict failed', detail: err.message });
+  }
+});
+
 // PATCH /outfits/:id — rename an outfit or swap its item list
 router.patch('/:id', (req, res) => {
   const outfits = readOutfits();
@@ -125,6 +143,7 @@ router.post('/:id/wear', (req, res) => {
     items[idx].lastWorn = now.toISOString();
     if (!Array.isArray(items[idx].wearHistory)) items[idx].wearHistory = [];
     items[idx].wearHistory.push(localDate);
+    if (items[idx].category !== 'shoes') items[idx].isDirty = true;
     wornCount++;
   }
   writeJSON(CLOSET_PATH, items);

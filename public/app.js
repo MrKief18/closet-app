@@ -39,8 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
   setupItemDetail();
   setupOutfitDetail();
   setupRatingSheet();
+  setupDressMe();
   loadCloset();
   initWeatherWidget(); // Feature: weather-aware daily outfit suggestion
+  setupSheets();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
 });
 
@@ -66,6 +68,7 @@ function switchView(view) {
   if (view === 'closet') loadCloset();
   if (view === 'outfits') loadOutfits();
   if (view === 'stats') loadStats();
+  if (view === 'dress') loadDressMeItems();
   if (view === 'add') {
     showPanel('panel-camera');
     document.getElementById('btn-show-camera').classList.add('active-option');
@@ -1057,6 +1060,7 @@ async function saveOutfitEdits() {
 
 function setupOutfitBuilder() {
   document.getElementById('btn-new-outfit').addEventListener('click', openOutfitModal);
+  document.getElementById('btn-fab-new-outfit')?.addEventListener('click', openOutfitModal);
   document.getElementById('btn-cancel-outfit').addEventListener('click', closeOutfitModal);
   document.getElementById('btn-save-outfit').addEventListener('click', saveOutfit);
   document.getElementById('outfit-modal').addEventListener('click', e => {
@@ -1907,4 +1911,309 @@ function showToast(msg, isError = false) {
 
 function esc(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Dress Me (Clueless Closet) ────────────────────────────────────────────────
+
+let _dressItems = {};        // slot -> item object (tops, bottoms, shoes, outerwear, accessories)
+let _dressBrowserAll = [];   // all closet items cached
+let _dressCatFilter = '';    // active category filter
+
+function setupDressMe() {
+  // Category tabs
+  document.querySelectorAll('.clueless-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.clueless-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      _dressCatFilter = tab.dataset.dresscat || '';
+      renderDressBrowser();
+    });
+  });
+
+  // Action buttons
+  document.getElementById('btn-dress-me')?.addEventListener('click', handleDressMe);
+  document.getElementById('btn-auto-dress')?.addEventListener('click', handleAutoDress);
+  document.getElementById('btn-dress-log')?.addEventListener('click', handleDressLog);
+  document.getElementById('btn-dress-save')?.addEventListener('click', handleDressSave);
+  document.getElementById('btn-dress-clear')?.addEventListener('click', handleDressClear);
+
+  // Clicking a layer slot removes that item
+  document.querySelectorAll('.outfit-layer').forEach(layer => {
+    layer.addEventListener('click', () => {
+      const slot = layer.dataset.slot;
+      if (_dressItems[slot]) {
+        delete _dressItems[slot];
+        clearCharacterLayer(slot);
+        renderDressBrowser();
+        hideDressVerdict();
+      }
+    });
+  });
+}
+
+async function loadDressMeItems() {
+  const browser = document.getElementById('dress-item-browser');
+  if (!browser) return;
+  browser.innerHTML = '<div class="dress-loading">LOADING WARDROBE…</div>';
+  try {
+    _dressBrowserAll = await apiFetch('/items');
+    renderDressBrowser();
+  } catch {
+    browser.innerHTML = '<div class="dress-loading">LOAD FAILED</div>';
+  }
+}
+
+function renderDressBrowser() {
+  const browser = document.getElementById('dress-item-browser');
+  if (!browser) return;
+
+  const items = _dressCatFilter
+    ? _dressBrowserAll.filter(i => i.category === _dressCatFilter)
+    : _dressBrowserAll;
+
+  if (!items.length) {
+    browser.innerHTML = '<div class="dress-loading">NO ITEMS</div>';
+    return;
+  }
+
+  browser.innerHTML = items.map(item => {
+    const inOutfit = Object.values(_dressItems).some(i => i.id === item.id);
+    const icon = catIcon(item.category);
+    const img = item.imageUrl
+      ? `<img src="${esc(item.imageUrl)}" alt="${esc(item.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+      : '';
+    return `
+      <div class="dress-thumb${inOutfit ? ' in-outfit' : ''}" data-id="${item.id}" title="${esc(item.name)}">
+        ${img}
+        <span class="dress-thumb-icon" style="${item.imageUrl ? 'display:none' : ''}">${icon}</span>
+        <span class="dress-thumb-label">${esc(item.name)}</span>
+      </div>`;
+  }).join('');
+
+  browser.querySelectorAll('.dress-thumb').forEach(thumb => {
+    thumb.addEventListener('click', () => {
+      const id = thumb.dataset.id;
+      const item = _dressBrowserAll.find(i => i.id === id);
+      if (!item) return;
+      // Toggle: if already in outfit, remove it; otherwise add it
+      if (_dressItems[item.category]?.id === item.id) {
+        delete _dressItems[item.category];
+        clearCharacterLayer(item.category);
+        hideDressVerdict();
+      } else {
+        _dressItems[item.category] = item;
+        updateCharacterLayer(item.category, item);
+        // Request verdict if 2+ items assembled
+        if (Object.keys(_dressItems).length >= 2) fetchDressVerdict();
+      }
+      renderDressBrowser();
+    });
+  });
+}
+
+function updateCharacterLayer(slot, item) {
+  const layer = document.getElementById(`layer-${slot}`);
+  if (!layer) return;
+  const icon = catIcon(slot);
+
+  const hasBg = !!item.bgRemovedUrl;
+  const src   = item.bgRemovedUrl || item.imageUrl;
+  const cls   = hasBg ? 'bg-removed' : 'bg-original';
+
+  if (src) {
+    layer.innerHTML = `<img src="${esc(src)}" class="${cls}" alt="${esc(item.name)}" onerror="this.style.display='none'">`;
+    // If we only have the original image, kick off background removal in the background
+    if (!hasBg && item.imageUrl) _triggerBgRemoval(item, slot);
+  } else {
+    layer.innerHTML = `<span class="layer-icon">${icon}</span>`;
+  }
+}
+
+async function _triggerBgRemoval(item, slot) {
+  try {
+    const result = await apiFetch(`/items/${item.id}/removebg`, { method: 'POST' });
+    if (!result.bgRemovedUrl) return;
+    // Cache on the local item so future drags skip the API call
+    const cached = _dressBrowserAll.find(i => i.id === item.id);
+    if (cached) cached.bgRemovedUrl = result.bgRemovedUrl;
+    // Upgrade the layer image if this item is still wearing that slot
+    if (_dressItems[slot]?.id === item.id) {
+      const img = document.getElementById(`layer-${slot}`)?.querySelector('img');
+      if (img) { img.src = result.bgRemovedUrl; img.className = 'bg-removed'; }
+    }
+  } catch { /* silently fail — original stays */ }
+}
+
+function clearCharacterLayer(slot) {
+  const layer = document.getElementById(`layer-${slot}`);
+  if (layer) layer.innerHTML = '';
+}
+
+function clearAllLayers() {
+  ['shoes','bottoms','tops','outerwear','accessories'].forEach(clearCharacterLayer);
+}
+
+async function fetchDressVerdict() {
+  const itemIds = Object.values(_dressItems).map(i => i.id);
+  if (itemIds.length < 2) return;
+  try {
+    const result = await apiFetch('/outfits/verdict', {
+      method: 'POST',
+      body: JSON.stringify({ itemIds })
+    });
+    showDressVerdict(result.verdict, result.reason);
+  } catch {
+    // Verdict failure is non-fatal — silently skip
+  }
+}
+
+function showDressVerdict(verdict, reason) {
+  const banner = document.getElementById('dress-verdict');
+  const text   = document.getElementById('dress-verdict-text');
+  const sub    = document.getElementById('dress-verdict-reason');
+  if (!banner) return;
+
+  banner.classList.remove('hidden', 'verdict-match', 'verdict-mismatch');
+  if (verdict === 'MATCH') {
+    banner.classList.add('verdict-match');
+    text.textContent = 'DRESS ME!';
+  } else {
+    banner.classList.add('verdict-mismatch');
+    text.textContent = 'MIS-MATCH!';
+  }
+  sub.textContent = reason || '';
+}
+
+function hideDressVerdict() {
+  document.getElementById('dress-verdict')?.classList.add('hidden');
+}
+
+async function handleDressMe() {
+  const btn = document.getElementById('btn-dress-me');
+  btn.textContent = 'THINKING…';
+  btn.disabled = true;
+  hideDressVerdict();
+  try {
+    const result = await apiFetch('/outfits/suggest', {
+      method: 'POST',
+      body: JSON.stringify({ occasion: 'casual day' })
+    });
+    const ids = result.itemIds || [];
+    // Clear current outfit, then animate items on one by one
+    _dressItems = {};
+    clearAllLayers();
+    const allItems = _dressBrowserAll;
+    for (const id of ids) {
+      const item = allItems.find(i => i.id === id);
+      if (!item) continue;
+      _dressItems[item.category] = item;
+      updateCharacterLayer(item.category, item);
+      await new Promise(r => setTimeout(r, 300)); // animate stagger
+    }
+    renderDressBrowser();
+    if (Object.keys(_dressItems).length >= 2) fetchDressVerdict();
+  } catch {
+    showToast('Dress Me failed — try again', true);
+  } finally {
+    btn.textContent = 'DRESS ME';
+    btn.disabled = false;
+  }
+}
+
+function handleAutoDress() {
+  // Group items by category, pick one random per category
+  const byCategory = {};
+  for (const item of _dressBrowserAll) {
+    if (!byCategory[item.category]) byCategory[item.category] = [];
+    byCategory[item.category].push(item);
+  }
+  _dressItems = {};
+  clearAllLayers();
+  hideDressVerdict();
+  for (const [cat, items] of Object.entries(byCategory)) {
+    const pick = items[Math.floor(Math.random() * items.length)];
+    _dressItems[cat] = pick;
+    updateCharacterLayer(cat, pick);
+  }
+  renderDressBrowser();
+  if (Object.keys(_dressItems).length >= 2) fetchDressVerdict();
+}
+
+async function handleDressLog() {
+  const ids = Object.values(_dressItems).map(i => i.id);
+  if (!ids.length) { showToast('Build an outfit first!', true); return; }
+  let count = 0;
+  for (const id of ids) {
+    try { await apiFetch(`/items/${id}/wear`, { method: 'POST' }); count++; } catch {}
+  }
+  showToast(`Logged ${count} item${count !== 1 ? 's' : ''} as worn!`);
+}
+
+async function handleDressSave() {
+  const ids = Object.values(_dressItems).map(i => i.id);
+  if (ids.length < 2) { showToast('Add at least 2 items first!', true); return; }
+  const name = prompt('Outfit name?');
+  if (!name?.trim()) return;
+  try {
+    await apiFetch('/outfits', {
+      method: 'POST',
+      body: JSON.stringify({ name: name.trim(), itemIds: ids })
+    });
+    showToast('Outfit saved!');
+  } catch (e) {
+    showToast(e.message || 'Could not save outfit', true);
+  }
+}
+
+function handleDressClear() {
+  _dressItems = {};
+  clearAllLayers();
+  hideDressVerdict();
+  renderDressBrowser();
+}
+
+// ── Bottom Sheet Manager ──────────────────────────────────────────────────────
+
+function setupSheets() {
+  const overlay = document.getElementById('sheet-overlay');
+  if (!overlay) return;
+
+  overlay.addEventListener('click', closeAllSheets);
+
+  // Sort sheet options
+  document.getElementById('btn-sort-open')?.addEventListener('click', () => openSheet('sheet-sort'));
+  document.querySelectorAll('.sort-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = btn.dataset.sort;
+      if (val) {
+        currentSort = val;
+        const sel = document.getElementById('closet-sort');
+        if (sel) sel.value = val;
+        loadCloset();
+      }
+      closeAllSheets();
+    });
+  });
+
+  // Swipe down to close sheets
+  let touchStartY = 0;
+  document.querySelectorAll('.bottom-sheet').forEach(sheet => {
+    sheet.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, { passive: true });
+    sheet.addEventListener('touchend', e => {
+      if (e.changedTouches[0].clientY - touchStartY > 60) closeAllSheets();
+    });
+  });
+}
+
+function openSheet(id) {
+  const overlay = document.getElementById('sheet-overlay');
+  const sheet = document.getElementById(id);
+  if (!overlay || !sheet) return;
+  overlay.classList.remove('hidden');
+  sheet.classList.remove('hidden');
+}
+
+function closeAllSheets() {
+  document.getElementById('sheet-overlay')?.classList.add('hidden');
+  document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.add('hidden'));
 }

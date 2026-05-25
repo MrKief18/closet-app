@@ -362,4 +362,31 @@ Respond ONLY with valid JSON (no markdown):
   return JSON.parse(raw);
 }
 
-module.exports = { analyzeImage, searchItem, searchItemOnline, findProductImage, findProductImages, suggestOutfit, smartSearch, suggestOutfitForWeather, analyzeWardrobeGaps };
+// Judge whether a set of clothing items form a stylish outfit
+async function verdictOutfit(items) {
+  const outfit = items.map(i => ({
+    name: i.name, category: i.category,
+    color: i.color, brand: i.brand || null, tags: i.tags || []
+  }));
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 256,
+    messages: [{
+      role: 'user',
+      content: `You are a personal stylist. Judge whether these clothing items form a stylish, cohesive outfit.
+
+Items: ${JSON.stringify(outfit)}
+
+Consider: color harmony, occasion match, style cohesion, and whether the combination makes sense.
+
+Respond ONLY with valid JSON (no markdown):
+{"verdict":"MATCH","reason":"one sentence why it works or clashes","suggestion":"one actionable tip"}`
+    }]
+  });
+
+  const raw = response.content[0].text.replace(/\`\`\`json\n?|\`\`\`/g, '').trim();
+  return JSON.parse(raw);
+}
+
+module.exports = { analyzeImage, searchItem, searchItemOnline, findProductImage, findProductImages, suggestOutfit, smartSearch, suggestOutfitForWeather, analyzeWardrobeGaps, verdictOutfit };

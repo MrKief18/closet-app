@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const { searchItem, searchItemOnline, findProductImage, findProductImages, smartSearch } = require('../services/ai');
 const { readJSON, writeJSON } = require('../services/db');
 
@@ -234,6 +235,50 @@ router.post('/:id/image', async (req, res) => {
     res.json(items[idx]);
   } catch (err) {
     res.status(500).json({ error: 'Image search failed', detail: err.message });
+  }
+});
+
+// POST /items/:id/removebg — call remove.bg API to strip the background from an item's product image.
+// Result is saved as a PNG file in public/bg-removed/ and the URL is cached on the item.
+// Subsequent calls return the cached URL instantly (no re-processing).
+router.post('/:id/removebg', async (req, res) => {
+  const items = readItems();
+  const idx = items.findIndex(i => i.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Item not found' });
+  const item = items[idx];
+
+  if (!item.imageUrl) return res.status(400).json({ error: 'Item has no image' });
+  if (item.bgRemovedUrl) return res.json({ bgRemovedUrl: item.bgRemovedUrl }); // already done
+
+  const apiKey = process.env.REMOVE_BG_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'REMOVE_BG_API_KEY not configured' });
+
+  try {
+    const r = await fetch('https://api.remove.bg/v1.0/removebg', {
+      method: 'POST',
+      headers: {
+        'X-Api-Key': apiKey,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: `image_url=${encodeURIComponent(item.imageUrl)}&size=auto`
+    });
+
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      return res.status(r.status).json({ error: 'remove.bg error', detail: err });
+    }
+
+    const buf = Buffer.from(await r.arrayBuffer());
+    const dir = path.join(__dirname, '../public/bg-removed');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, `${item.id}.png`), buf);
+
+    const bgRemovedUrl = `/bg-removed/${item.id}.png`;
+    items[idx].bgRemovedUrl = bgRemovedUrl;
+    writeItems(items);
+    res.json({ bgRemovedUrl });
+  } catch (err) {
+    res.status(500).json({ error: 'Background removal failed', detail: err.message });
   }
 });
 
