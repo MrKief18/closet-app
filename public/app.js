@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupOutfitDetail();
   setupRatingSheet();
   loadCloset();
+  initWeatherWidget(); // Feature: weather-aware daily outfit suggestion
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
 });
 
@@ -824,6 +825,59 @@ function setupOutfitDetail() {
   });
 }
 
+// ── Post-wear Rating Sheet ────────────────────────────────────────────────────
+
+function showRatingSheet(outfitId) {
+  _pendingRatingId = outfitId;
+  // Reset all stars to unlit before showing the sheet
+  document.querySelectorAll('.star-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('rating-modal').classList.remove('hidden');
+}
+
+function closeRatingSheet() {
+  document.getElementById('rating-modal').classList.add('hidden');
+  _pendingRatingId = null;
+}
+
+function setupRatingSheet() {
+  const stars = document.querySelectorAll('.star-btn');
+
+  // Hover — light up stars up to the hovered one
+  stars.forEach(btn => {
+    btn.addEventListener('mouseenter', () => {
+      const val = parseInt(btn.dataset.val);
+      stars.forEach(s => s.classList.toggle('active', parseInt(s.dataset.val) <= val));
+    });
+  });
+
+  // Mouse leaves the overlay — reset star highlight
+  document.getElementById('rating-modal').addEventListener('mouseleave', () => {
+    stars.forEach(b => b.classList.remove('active'));
+  });
+
+  // Click a star — submit rating, close sheet, refresh outfit list
+  stars.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const val = parseInt(btn.dataset.val);
+      if (!_pendingRatingId) return;
+      try {
+        await apiFetch(`/outfits/${_pendingRatingId}/rate`, {
+          method: 'POST',
+          body: JSON.stringify({ rating: val })
+        });
+        showToast(`Rated ${val} star${val !== 1 ? 's' : ''}!`);
+      } catch {
+        showToast('Could not save rating', true);
+      }
+      closeRatingSheet();
+      loadOutfits(); // refresh cards so avgRating badge updates
+    });
+  });
+
+  // Skip — dismiss the sheet without rating
+  document.getElementById('btn-skip-rating').addEventListener('click', () => closeRatingSheet());
+}
+
 async function openOutfitDetail(id) {
   detailOutfitId = id;
   try {
@@ -1256,6 +1310,13 @@ function renderStats(d) {
       <h3>Wear Calendar</h3>
       <div id="wear-calendar"></div>
       <div id="calendar-day-detail" class="calendar-day-detail hidden"></div>
+    </div>
+    <div class="stats-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h3>Wardrobe Analysis</h3>
+        <button id="btn-analyze-gaps" class="btn-secondary" style="font-size:12px;padding:6px 12px">Analyze ✨</button>
+      </div>
+      <div id="gap-analysis-result"></div>
     </div>`;
 
   // Initialise calendar
@@ -1263,6 +1324,53 @@ function renderStats(d) {
   _calYear  = new Date().getFullYear();
   _calMonth = new Date().getMonth();
   renderCalendar();
+
+  // Wire up the wardrobe gap analysis button (rendered into stats-content above)
+  document.getElementById('btn-analyze-gaps').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-analyze-gaps');
+    const resultEl = document.getElementById('gap-analysis-result');
+    btn.disabled = true;
+    btn.textContent = 'Analyzing…';
+    resultEl.innerHTML = '<p class="loading">Analyzing your wardrobe…</p>';
+
+    try {
+      const data = await apiFetch('/stats/gaps');
+      if (data.message) {
+        resultEl.innerHTML = `<p class="empty-state">${esc(data.message)}</p>`;
+        return;
+      }
+
+      // Color-code gap priority labels
+      const priorityColor = { high: 'var(--red)', medium: 'var(--blue)', low: 'var(--text2)' };
+      resultEl.innerHTML = `
+        <div class="gap-score-row">
+          <div class="gap-score">${data.score}</div>
+          <div>
+            <div class="gap-score-label">${esc(data.scoreLabel)}</div>
+            <div class="gap-score-sub">out of 100</div>
+          </div>
+        </div>
+        ${data.strengths?.length ? `<p class="gap-strength">✓ ${esc(data.strengths[0])}</p>` : ''}
+        <div class="gap-list">
+          ${(data.gaps || []).map(g => `
+            <div class="gap-item">
+              <div class="gap-priority" style="background:${priorityColor[g.priority] || 'var(--muted)'}22;color:${priorityColor[g.priority] || 'var(--muted)'}">
+                ${g.priority}
+              </div>
+              <div>
+                <div class="gap-item-name">${esc(g.item)}</div>
+                <div class="gap-item-reason">${esc(g.reason)}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+        ${data.tip ? `<p class="gap-tip">💡 ${esc(data.tip)}</p>` : ''}`;
+    } catch {
+      resultEl.innerHTML = '<p class="error-msg">Analysis failed — try again</p>';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Analyze ✨';
+    }
+  });
 }
 
 function renderCalendar() {
@@ -1322,6 +1430,9 @@ function showCalendarDay(dateStr) {
   const d = new Date(dateStr + 'T12:00:00');
   const label = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
+  // Capture item IDs in the closure so the async handler always uses this day's IDs
+  const wornIds = items.map(it => it.id);
+
   const el = document.getElementById('calendar-day-detail');
   el.innerHTML = `
     <div class="cal-detail-date">${esc(label)}</div>
@@ -1334,8 +1445,27 @@ function showCalendarDay(dateStr) {
           <div class="wear-log-icon" style="${it.imageUrl ? 'display:none' : ''}">${catIcon(it.category)}</div>
           <span class="wear-log-name">${esc(it.name)}</span>
         </div>`).join('')}
-    </div>`;
+    </div>
+    ${wornIds.length ? `<button class="btn-wear-again" data-date="${esc(dateStr)}">&#8635; Wear Again</button>` : ''}`;
   el.classList.remove('hidden');
+
+  // Wire up Wear Again — logs all items from that day as worn today, then refreshes stats
+  const wearAgainBtn = el.querySelector('.btn-wear-again');
+  if (wearAgainBtn) {
+    wearAgainBtn.addEventListener('click', async () => {
+      wearAgainBtn.disabled = true;
+      wearAgainBtn.textContent = '…';
+      let count = 0;
+      for (const id of wornIds) {
+        try {
+          await apiFetch(`/items/${id}/wear`, { method: 'POST' });
+          count++;
+        } catch {}
+      }
+      showToast(`Logged ${count} item${count !== 1 ? 's' : ''} as worn!`);
+      loadStats();
+    });
+  }
 }
 
 // ── Suggest Outfit Modal ──────────────────────────────────────────────────────

@@ -1191,6 +1191,24 @@ main { padding: 28px; max-width: 1040px; margin: 0 auto; }
 .btn-wear-again:hover { background: rgba(96,165,250,0.18); }
 .btn-wear-again:disabled { opacity: 0.5; cursor: default; }
 
+/* ── Feature 1: Dirty/Clean state ── */
+/* Dim the card when item needs washing; laundry badge appears top-left */
+.item-card.item-dirty { opacity: 0.55; }
+.item-dirty-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-size: 16px;
+  line-height: 1;
+  z-index: 6;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.7));
+}
+
+/* ── Feature 3: Archived state ── */
+/* Subtly dim archived cards to distinguish them from active closet */
+.item-card.item-archived { opacity: 0.5; }
+
 /* ── Responsive ── */
 @media (max-width: 640px) {
   header { padding: 0 16px; }
