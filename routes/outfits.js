@@ -99,6 +99,30 @@ router.patch('/:id', (req, res) => {
   res.json({ ...outfits[idx], items: populateItems(outfits[idx].itemIds) });
 });
 
+// POST /outfits/:id/wear — log every item in the outfit as worn today
+router.post('/:id/wear', (req, res) => {
+  const outfits = readOutfits();
+  const outfit = outfits.find(o => o.id === req.params.id);
+  if (!outfit) return res.status(404).json({ error: 'Outfit not found' });
+
+  const items = readItems();
+  const now = new Date();
+  const localDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+  let wornCount = 0;
+  for (const id of outfit.itemIds) {
+    const idx = items.findIndex(i => i.id === id);
+    if (idx === -1) continue;
+    items[idx].wearCount = (items[idx].wearCount || 0) + 1;
+    items[idx].lastWorn = now.toISOString();
+    if (!Array.isArray(items[idx].wearHistory)) items[idx].wearHistory = [];
+    items[idx].wearHistory.push(localDate);
+    wornCount++;
+  }
+  writeJSON(CLOSET_PATH, items);
+  res.json({ wornCount });
+});
+
 // DELETE /outfits/:id — remove a saved outfit
 router.delete('/:id', (req, res) => {
   const outfits = readOutfits();

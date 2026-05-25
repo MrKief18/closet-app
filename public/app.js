@@ -627,19 +627,25 @@ async function loadOutfits() {
           <div class="outfit-card-body">
             <span class="outfit-name">${esc(o.name)}</span>
             <span class="outfit-item-count">${(o.items || []).length} items</span>
-            <button class="btn-delete-outfit" data-id="${o.id}" title="Delete">×</button>
+            <div class="outfit-card-actions">
+              <button class="btn-wear-outfit" data-id="${o.id}" title="Log all items as worn today">✓ Wore This</button>
+              <button class="btn-delete-outfit" data-id="${o.id}" title="Delete">×</button>
+            </div>
           </div>
         </div>`;
     }).join('');
 
     list.querySelectorAll('.outfit-card').forEach(card => {
       card.addEventListener('click', e => {
-        if (e.target.closest('.btn-delete-outfit')) return;
+        if (e.target.closest('.btn-delete-outfit') || e.target.closest('.btn-wear-outfit')) return;
         openOutfitDetail(card.dataset.id);
       });
     });
     list.querySelectorAll('.btn-delete-outfit').forEach(btn => {
       btn.addEventListener('click', e => { e.stopPropagation(); deleteOutfit(btn.dataset.id); });
+    });
+    list.querySelectorAll('.btn-wear-outfit').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); wearOutfit(btn.dataset.id, btn); });
     });
   } catch {
     document.getElementById('outfits-list').innerHTML = '<p class="empty-state">Failed to load outfits.</p>';
@@ -656,6 +662,18 @@ async function deleteOutfit(id) {
   }
 }
 
+async function wearOutfit(id, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const { wornCount } = await apiFetch(`/outfits/${id}/wear`, { method: 'POST' });
+    showToast(`Logged ${wornCount} item${wornCount !== 1 ? 's' : ''} as worn today!`);
+    loadOutfits();
+  } catch {
+    showToast('Failed to log wear', true);
+    if (btn) { btn.disabled = false; btn.textContent = '✓ Wore This'; }
+  }
+}
+
 // ── Outfit Detail Modal ───────────────────────────────────────────────────────
 
 function setupOutfitDetail() {
@@ -667,6 +685,11 @@ function setupOutfitDetail() {
   document.getElementById('btn-close-outfit-detail2').addEventListener('click', close);
   document.getElementById('outfit-detail-modal').addEventListener('click', e => {
     if (e.target === e.currentTarget) close();
+  });
+  document.getElementById('btn-outfit-detail-wear').addEventListener('click', () => {
+    const id = detailOutfitId;
+    close();
+    wearOutfit(id);
   });
   document.getElementById('btn-outfit-detail-delete').addEventListener('click', () => {
     close();

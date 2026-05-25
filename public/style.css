@@ -396,6 +396,15 @@ main { padding: 28px; max-width: 1040px; margin: 0 auto; }
 }
 .outfit-name { font-weight: 600; font-size: 14px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .outfit-item-count { font-size: 12px; color: var(--text2); flex-shrink: 0; }
+.outfit-card-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.btn-wear-outfit {
+  background: var(--blue)18; border: 1px solid var(--blue)44;
+  color: var(--blue); font-size: 12px; font-weight: 600;
+  padding: 5px 10px; border-radius: var(--radius-sm);
+  cursor: pointer; white-space: nowrap; transition: background 0.15s;
+}
+.btn-wear-outfit:hover { background: var(--blue)30; }
+.btn-wear-outfit:disabled { opacity: 0.5; cursor: default; }
 
 .btn-delete-outfit {
   background: none; border: none;
