@@ -30,7 +30,19 @@ router.get('/', (req, res) => {
     .slice(0, 5)
     .map(({ name, category, wearCount }) => ({ name, category, wearCount }));
 
-  res.json({ totalItems: items.length, totalOutfits: outfits.length, byCategory, byColor, neverWorn, wornThisMonth, mostWorn });
+  // Build wear log: group every wear entry by date, sorted newest-first
+  const wearLogMap = {};
+  for (const item of items) {
+    for (const date of (item.wearHistory || [])) {
+      if (!wearLogMap[date]) wearLogMap[date] = [];
+      wearLogMap[date].push({ id: item.id, name: item.name, category: item.category, imageUrl: item.imageUrl || null });
+    }
+  }
+  const wearLog = Object.fromEntries(
+    Object.entries(wearLogMap).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 60)
+  );
+
+  res.json({ totalItems: items.length, totalOutfits: outfits.length, byCategory, byColor, neverWorn, wornThisMonth, mostWorn, wearLog });
 });
 
 module.exports = router;

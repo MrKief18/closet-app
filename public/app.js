@@ -568,10 +568,26 @@ async function openItemDetail(id) {
     document.getElementById('detail-size').textContent = item.size || '—';
     document.getElementById('detail-brand').textContent = item.brand || '—';
 
-    const wearText = item.wearCount
-      ? `${item.wearCount}× ${item.lastWorn ? '· ' + new Date(item.lastWorn).toLocaleDateString() : ''}`
-      : 'Never worn';
-    document.getElementById('detail-wear').textContent = wearText;
+    const history = item.wearHistory || [];
+    const wearEl = document.getElementById('detail-wear');
+    if (!history.length) {
+      wearEl.textContent = 'Never worn';
+    } else {
+      const latest = new Date(history[history.length - 1] + 'T12:00:00').toLocaleDateString();
+      wearEl.innerHTML = `${history.length}× &nbsp;<span class="wear-history-toggle" id="wear-toggle-btn">Last: ${esc(latest)} ▾</span>`;
+      document.getElementById('wear-toggle-btn').addEventListener('click', () => {
+        const existing = document.getElementById('wear-history-list');
+        if (existing) { existing.remove(); return; }
+        const list = document.createElement('div');
+        list.id = 'wear-history-list';
+        list.className = 'wear-history-list';
+        list.innerHTML = [...history].reverse().map(date => {
+          const d = new Date(date + 'T12:00:00');
+          return `<div class="wear-history-date">${d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</div>`;
+        }).join('');
+        wearEl.after(list);
+      });
+    }
 
     document.getElementById('detail-tags').innerHTML =
       (item.tags || []).map(t => `<span class="tag-chip">${esc(t)}</span>`).join('');
@@ -1007,6 +1023,32 @@ async function loadStats() {
 function renderStats(d) {
   const cats = Object.entries(d.byCategory).sort((a, b) => b[1] - a[1]);
   const maxCat = cats[0]?.[1] || 1;
+  const wearLogEntries = Object.entries(d.wearLog || {});
+
+  const wearLogHtml = wearLogEntries.length ? `
+    <div class="stats-section">
+      <h3>Wear History</h3>
+      <div class="wear-log">
+        ${wearLogEntries.map(([date, items]) => {
+          const d = new Date(date + 'T12:00:00');
+          const label = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+          return `
+            <div class="wear-log-day">
+              <div class="wear-log-date">${esc(label)}</div>
+              <div class="wear-log-items">
+                ${items.map(it => `
+                  <div class="wear-log-item">
+                    ${it.imageUrl
+                      ? `<img src="${esc(it.imageUrl)}" class="wear-log-thumb" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+                      : ''}
+                    <div class="wear-log-icon" style="${it.imageUrl ? 'display:none' : ''}">${catIcon(it.category)}</div>
+                    <span class="wear-log-name">${esc(it.name)}</span>
+                  </div>`).join('')}
+              </div>
+            </div>`;
+        }).join('')}
+      </div>
+    </div>` : '';
 
   document.getElementById('stats-content').innerHTML = `
     <div class="stat-cards">
@@ -1035,7 +1077,8 @@ function renderStats(d) {
               <span class="most-worn-count">${i.wearCount}×</span>
             </div>`).join('')}
         </div>` : ''}
-    </div>`;
+    </div>
+    ${wearLogHtml}`;
 }
 
 // ── Suggest Outfit Modal ──────────────────────────────────────────────────────

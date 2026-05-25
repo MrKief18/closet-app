@@ -117,8 +117,12 @@ router.post('/:id/wear', (req, res) => {
   const items = readItems();
   const idx = items.findIndex(i => i.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Item not found' });
+  const now = new Date();
   items[idx].wearCount = (items[idx].wearCount || 0) + 1;
-  items[idx].lastWorn = new Date().toISOString();
+  items[idx].lastWorn = now.toISOString();
+  if (!Array.isArray(items[idx].wearHistory)) items[idx].wearHistory = [];
+  const localDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  items[idx].wearHistory.push(localDate);
   writeItems(items);
   res.json(items[idx]);
 });
