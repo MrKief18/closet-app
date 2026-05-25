@@ -79,6 +79,27 @@ async function searchItem(query) {
   return JSON.parse(response.content[0].text);
 }
 
+// Return up to `count` product image URLs for user selection
+async function findProductImages(details, count = 6) {
+  const q = [details.brand, details.name, details.color].filter(Boolean).join(' ');
+  const serpKey = process.env.SERPAPI_KEY;
+  if (serpKey) {
+    try {
+      const url = `https://serpapi.com/search.json` +
+        `?engine=google_images&q=${encodeURIComponent(q + ' product')}&num=${count}&api_key=${serpKey}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        return (data.images_results || [])
+          .slice(0, count)
+          .map(r => r.original || r.thumbnail)
+          .filter(Boolean);
+      }
+    } catch {}
+  }
+  return [];
+}
+
 // Find a real product photo. Priority: SerpAPI (Google Images) → Unsplash fallback.
 async function findProductImage(details) {
   // Tightest possible query: brand + product name + color
@@ -143,4 +164,4 @@ Respond ONLY with valid JSON (no markdown):
   return JSON.parse(response.content[0].text);
 }
 
-module.exports = { analyzeImage, searchItem, findProductImage, suggestOutfit };
+module.exports = { analyzeImage, searchItem, findProductImage, findProductImages, suggestOutfit };

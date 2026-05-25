@@ -219,21 +219,68 @@
         <div id="detail-icon" class="detail-icon hidden"></div>
       </div>
       <div class="detail-body">
-        <div>
-          <h2 id="detail-name"></h2>
-          <span id="detail-cat-badge" class="item-cat-badge"></span>
+        <!-- View mode -->
+        <div id="detail-view">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+            <div>
+              <h2 id="detail-name"></h2>
+              <span id="detail-cat-badge" class="item-cat-badge"></span>
+            </div>
+            <button id="btn-detail-edit" class="btn-edit-toggle">Edit</button>
+          </div>
+          <div class="detail-meta-grid">
+            <div class="detail-meta-item"><span class="detail-meta-label">Color</span><span id="detail-color"></span></div>
+            <div class="detail-meta-item"><span class="detail-meta-label">Size</span><span id="detail-size"></span></div>
+            <div class="detail-meta-item"><span class="detail-meta-label">Brand</span><span id="detail-brand"></span></div>
+            <div class="detail-meta-item"><span class="detail-meta-label">Worn</span><span id="detail-wear"></span></div>
+          </div>
+          <div id="detail-tags" class="item-tags"></div>
+          <div class="detail-actions">
+            <button id="btn-detail-wear" class="btn-primary">✓ Log Wear</button>
+            <button id="btn-detail-find-img" class="btn-secondary hidden">🔍 Find Image</button>
+            <button id="btn-detail-delete" class="btn-secondary btn-danger">Delete</button>
+          </div>
         </div>
-        <div class="detail-meta-grid">
-          <div class="detail-meta-item"><span class="detail-meta-label">Color</span><span id="detail-color"></span></div>
-          <div class="detail-meta-item"><span class="detail-meta-label">Size</span><span id="detail-size"></span></div>
-          <div class="detail-meta-item"><span class="detail-meta-label">Brand</span><span id="detail-brand"></span></div>
-          <div class="detail-meta-item"><span class="detail-meta-label">Worn</span><span id="detail-wear"></span></div>
-        </div>
-        <div id="detail-tags" class="item-tags"></div>
-        <div class="detail-actions">
-          <button id="btn-detail-wear" class="btn-primary">✓ Log Wear</button>
-          <button id="btn-detail-find-img" class="btn-secondary hidden">🔍 Find Image</button>
-          <button id="btn-detail-delete" class="btn-secondary btn-danger">Delete</button>
+        <!-- Edit mode -->
+        <div id="detail-edit" class="hidden">
+          <div class="detail-edit-grid">
+            <label class="detail-edit-label">Name<input type="text" id="edit-name" class="detail-edit-input"></label>
+            <label class="detail-edit-label">Category
+              <select id="edit-category" class="detail-edit-input">
+                <option value="tops">Tops</option>
+                <option value="bottoms">Bottoms</option>
+                <option value="shoes">Shoes</option>
+                <option value="outerwear">Outerwear</option>
+                <option value="accessories">Accessories</option>
+              </select>
+            </label>
+            <label class="detail-edit-label">Color<input type="text" id="edit-color" class="detail-edit-input"></label>
+            <label class="detail-edit-label">Size<input type="text" id="edit-size" class="detail-edit-input" placeholder="optional"></label>
+            <label class="detail-edit-label">Brand<input type="text" id="edit-brand" class="detail-edit-input" placeholder="optional"></label>
+          </div>
+          <div class="detail-edit-tags">
+            <span class="detail-meta-label">Tags</span>
+            <div class="tag-checks" style="margin-top:8px">
+              <label class="tag-check-label"><input type="checkbox" class="edit-tag-check" value="casual"> Casual</label>
+              <label class="tag-check-label"><input type="checkbox" class="edit-tag-check" value="work"> Work</label>
+              <label class="tag-check-label"><input type="checkbox" class="edit-tag-check" value="formal"> Formal</label>
+              <label class="tag-check-label"><input type="checkbox" class="edit-tag-check" value="gym"> Gym</label>
+              <label class="tag-check-label"><input type="checkbox" class="edit-tag-check" value="outdoor"> Outdoor</label>
+            </div>
+          </div>
+          <div class="detail-edit-img-section">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <span class="detail-meta-label">Image</span>
+              <button id="btn-load-images" class="btn-edit-toggle">Browse Images</button>
+            </div>
+            <div id="image-picker-grid" class="image-picker-grid hidden"></div>
+            <div id="image-picker-loading" class="loading hidden">Finding images…</div>
+          </div>
+          <div id="detail-edit-error" class="error-msg hidden"></div>
+          <div class="detail-actions">
+            <button id="btn-detail-save" class="btn-primary">Save Changes</button>
+            <button id="btn-detail-cancel-edit" class="btn-secondary">Cancel</button>
+          </div>
         </div>
       </div>
     </div>

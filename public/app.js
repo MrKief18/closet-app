@@ -252,11 +252,15 @@ async function findImageForItem(btn) {
 
 // ── Item Detail Modal ─────────────────────────────────────────────────────────
 
+let selectedImageUrl = null; // tracks image chosen in picker
+
 function setupItemDetail() {
   document.getElementById('btn-close-detail').addEventListener('click', closeItemDetail);
   document.getElementById('item-detail-modal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeItemDetail();
   });
+
+  // View mode actions
   document.getElementById('btn-detail-wear').addEventListener('click', () => {
     closeItemDetail();
     wearItem(detailItemId);
@@ -280,12 +284,148 @@ function setupItemDetail() {
     closeItemDetail();
     deleteItem(detailItemId);
   });
+
+  // Edit toggle
+  document.getElementById('btn-detail-edit').addEventListener('click', enterEditMode);
+  document.getElementById('btn-detail-cancel-edit').addEventListener('click', exitEditMode);
+  document.getElementById('btn-detail-save').addEventListener('click', saveItemEdits);
+
+  // Image picker
+  document.getElementById('btn-load-images').addEventListener('click', loadImagePicker);
+}
+
+function enterEditMode() {
+  const item = window._detailItem;
+  if (!item) return;
+
+  // Pre-fill inputs
+  document.getElementById('edit-name').value = item.name || '';
+  document.getElementById('edit-color').value = item.color || '';
+  document.getElementById('edit-size').value = item.size || '';
+  document.getElementById('edit-brand').value = item.brand || '';
+  const catSelect = document.getElementById('edit-category');
+  [...catSelect.options].forEach(o => { o.selected = o.value === item.category; });
+
+  // Pre-check tags
+  document.querySelectorAll('.edit-tag-check').forEach(cb => {
+    cb.checked = (item.tags || []).includes(cb.value);
+  });
+
+  // Reset image picker
+  selectedImageUrl = item.imageUrl || null;
+  document.getElementById('image-picker-grid').classList.add('hidden');
+  document.getElementById('image-picker-grid').innerHTML = '';
+  document.getElementById('image-picker-loading').classList.add('hidden');
+  document.getElementById('btn-load-images').textContent = 'Browse Images';
+
+  document.getElementById('detail-edit-error').classList.add('hidden');
+  document.getElementById('detail-view').classList.add('hidden');
+  document.getElementById('detail-edit').classList.remove('hidden');
+}
+
+function exitEditMode() {
+  document.getElementById('detail-edit').classList.add('hidden');
+  document.getElementById('detail-view').classList.remove('hidden');
+}
+
+async function loadImagePicker() {
+  const btn = document.getElementById('btn-load-images');
+  const grid = document.getElementById('image-picker-grid');
+  const loading = document.getElementById('image-picker-loading');
+
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  grid.classList.add('hidden');
+  loading.classList.remove('hidden');
+
+  try {
+    const data = await apiFetch(`/items/${detailItemId}/images`);
+    loading.classList.add('hidden');
+
+    if (!data.images.length) {
+      btn.textContent = 'No images found';
+      btn.disabled = false;
+      return;
+    }
+
+    grid.innerHTML = data.images.map((url, i) =>
+      `<img class="image-picker-thumb${selectedImageUrl === url ? ' selected' : ''}"
+            src="${esc(url)}" data-url="${esc(url)}" alt="Option ${i + 1}"
+            onerror="this.style.display='none'">`
+    ).join('');
+
+    grid.querySelectorAll('.image-picker-thumb').forEach(img => {
+      img.addEventListener('click', () => {
+        grid.querySelectorAll('.image-picker-thumb').forEach(t => t.classList.remove('selected'));
+        img.classList.add('selected');
+        selectedImageUrl = img.dataset.url;
+        // Live-preview the selection on the modal image
+        const detailImg = document.getElementById('detail-img');
+        detailImg.src = selectedImageUrl;
+        detailImg.classList.remove('hidden');
+        document.getElementById('detail-icon').classList.add('hidden');
+      });
+    });
+
+    grid.classList.remove('hidden');
+    btn.textContent = 'Refresh';
+    btn.disabled = false;
+  } catch {
+    loading.classList.add('hidden');
+    btn.textContent = 'Browse Images';
+    btn.disabled = false;
+    showToast('Could not load images', true);
+  }
+}
+
+async function saveItemEdits() {
+  const name = document.getElementById('edit-name').value.trim();
+  const color = document.getElementById('edit-color').value.trim();
+  const errEl = document.getElementById('detail-edit-error');
+  errEl.classList.add('hidden');
+
+  if (!name || !color) {
+    errEl.textContent = 'Name and color are required.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const tags = [...document.querySelectorAll('.edit-tag-check:checked')].map(cb => cb.value);
+  const body = {
+    name,
+    category: document.getElementById('edit-category').value,
+    color,
+    size: document.getElementById('edit-size').value.trim() || null,
+    brand: document.getElementById('edit-brand').value.trim() || null,
+    tags,
+    imageUrl: selectedImageUrl || null
+  };
+
+  const saveBtn = document.getElementById('btn-detail-save');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+
+  try {
+    await apiFetch(`/items/${detailItemId}`, { method: 'PATCH', body: JSON.stringify(body) });
+    showToast('Changes saved!');
+    closeItemDetail();
+    loadCloset();
+  } catch (e) {
+    errEl.textContent = e.message || 'Failed to save.';
+    errEl.classList.remove('hidden');
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Changes';
+  }
 }
 
 async function openItemDetail(id) {
   detailItemId = id;
+  // Reset to view mode each time
+  document.getElementById('detail-edit').classList.add('hidden');
+  document.getElementById('detail-view').classList.remove('hidden');
   try {
     const item = await apiFetch(`/items/${id}`);
+    window._detailItem = item;
     const color = catColor(item.category);
 
     const img = document.getElementById('detail-img');

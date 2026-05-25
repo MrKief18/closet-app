@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const { searchItem, findProductImage } = require('../services/ai');
+const { searchItem, findProductImage, findProductImages } = require('../services/ai');
 const { readJSON, writeJSON } = require('../services/db');
 
 const router = express.Router();
@@ -105,6 +105,19 @@ router.post('/:id/wear', (req, res) => {
   items[idx].lastWorn = new Date().toISOString();
   writeItems(items);
   res.json(items[idx]);
+});
+
+// GET /items/:id/images — return multiple image options for user selection
+router.get('/:id/images', async (req, res) => {
+  const items = readItems();
+  const item = items.find(i => i.id === req.params.id);
+  if (!item) return res.status(404).json({ error: 'Item not found' });
+  try {
+    const images = await findProductImages(item, 6);
+    res.json({ images });
+  } catch (err) {
+    res.status(500).json({ error: 'Image search failed', detail: err.message });
+  }
 });
 
 // POST /items/:id/image — fetch and attach a product image for an existing item
