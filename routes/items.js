@@ -90,6 +90,15 @@ router.post('/smart-search', async (req, res) => {
   }
 });
 
+// POST /items/clean-all — mark every item as clean (isDirty = false)
+router.post('/clean-all', (req, res) => {
+  const items = readItems();
+  let count = 0;
+  items.forEach(i => { if (i.isDirty) { i.isDirty = false; count++; } });
+  writeItems(items);
+  res.json({ cleaned: count });
+});
+
 // GET /items/:id — get a single item by id
 router.get('/:id', (req, res) => {
   const items = readItems();

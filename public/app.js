@@ -226,6 +226,20 @@ function applySearch(items) {
 // ── Closet ────────────────────────────────────────────────────────────────────
 
 function setupFilters() {
+  document.getElementById('btn-clean-all').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-clean-all');
+    btn.disabled = true;
+    try {
+      const { cleaned } = await apiFetch('/items/clean-all', { method: 'POST' });
+      showToast(cleaned > 0 ? `${cleaned} item${cleaned !== 1 ? 's' : ''} marked clean!` : 'All items already clean');
+      loadCloset();
+    } catch {
+      showToast('Failed to mark items clean', true);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
   document.querySelectorAll('.filter[data-cat]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.filter[data-cat]').forEach(b => b.classList.remove('active'));
@@ -1677,7 +1691,7 @@ async function requestSuggestion(occasion) {
     const data = await apiFetch('/outfits/suggest', { method: 'POST', body: JSON.stringify({ occasion }) });
     suggestResult = data;
 
-    document.getElementById('suggest-outfit-name').textContent = data.name;
+    document.getElementById('suggest-outfit-name').value = data.name;
     document.getElementById('suggest-reasoning').textContent = data.reasoning || '';
 
     const allItems = await apiFetch('/items');
@@ -1704,12 +1718,18 @@ async function requestSuggestion(occasion) {
 
 async function saveSuggestion() {
   if (!suggestResult) return;
+  const name  = document.getElementById('suggest-outfit-name').value.trim();
   const errEl = document.getElementById('suggest-save-error');
   errEl.classList.add('hidden');
+  if (!name) {
+    errEl.textContent = 'Please enter a name for this outfit.';
+    errEl.classList.remove('hidden');
+    return;
+  }
   try {
     await apiFetch('/outfits', {
       method: 'POST',
-      body: JSON.stringify({ name: suggestResult.name, itemIds: suggestResult.itemIds })
+      body: JSON.stringify({ name, itemIds: suggestResult.itemIds })
     });
     closeSuggestModal();
     showToast('Outfit saved!');

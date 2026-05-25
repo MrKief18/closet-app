@@ -53,6 +53,7 @@
           <option value="worn">Most Worn</option>
           <option value="never">Never Worn</option>
         </select>
+        <button id="btn-clean-all" class="btn-secondary btn-clean-all" title="Mark all items as clean">🧺 Clean All</button>
       </div>
       <div class="filter-bar">
         <button class="filter active" data-cat="">All</button>
@@ -199,7 +200,7 @@
       </div>
       <div id="suggest-loading" class="loading hidden">Picking the perfect outfit…</div>
       <div id="suggest-result" class="hidden">
-        <p class="suggest-name" id="suggest-outfit-name"></p>
+        <input type="text" class="suggest-name-input" id="suggest-outfit-name" placeholder="Outfit name…">
         <p class="suggest-reason" id="suggest-reasoning"></p>
         <div id="suggest-items-list" class="suggest-items-list"></div>
         <div id="suggest-save-error" class="error-msg hidden"></div>
