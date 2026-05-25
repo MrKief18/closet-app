@@ -7,6 +7,7 @@
   <title>Closet App</title>
   <link rel="stylesheet" href="style.css">
   <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
 </head>
 <body>
 
@@ -27,7 +28,9 @@
       <div class="closet-toolbar">
         <div class="search-box">
           <span class="search-icon">⌕</span>
-          <input type="text" id="closet-search" placeholder="Search items…" class="closet-search-input">
+          <input type="text" id="closet-search" placeholder="Search or describe what you're looking for…" class="closet-search-input">
+          <button id="btn-smart-search" class="btn-smart-search" title="AI Search">✨</button>
+          <button id="btn-clear-search" class="btn-clear-search hidden">×</button>
         </div>
         <select id="closet-sort" class="sort-select">
           <option value="newest">Newest</option>
@@ -53,6 +56,7 @@
         <button class="filter" data-tag="gym">Gym</button>
         <button class="filter" data-tag="outdoor">Outdoor</button>
       </div>
+      <div id="ai-search-banner" class="ai-search-banner hidden"></div>
       <div id="items-grid" class="items-grid"></div>
     </section>
 

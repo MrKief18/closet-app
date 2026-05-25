@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const { searchItem, findProductImage, findProductImages } = require('../services/ai');
+const { searchItem, findProductImage, findProductImages, smartSearch } = require('../services/ai');
 const { readJSON, writeJSON } = require('../services/db');
 
 const router = express.Router();
@@ -46,6 +46,21 @@ router.get('/search', async (req, res) => {
     res.json({ query: q, details, imageUrl });
   } catch (err) {
     res.status(500).json({ error: 'Search failed', detail: err.message });
+  }
+});
+
+// POST /items/smart-search — Claude-powered natural language search
+router.post('/smart-search', async (req, res) => {
+  const { query } = req.body;
+  if (!query) return res.status(400).json({ error: 'query is required' });
+  try {
+    const items = readItems();
+    if (!items.length) return res.json({ items: [] });
+    const result = await smartSearch(query, items);
+    const matched = (result.ids || []).map(id => items.find(i => i.id === id)).filter(Boolean);
+    res.json({ items: matched });
+  } catch (err) {
+    res.status(500).json({ error: 'Smart search failed', detail: err.message });
   }
 });
 

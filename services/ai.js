@@ -164,4 +164,30 @@ Respond ONLY with valid JSON (no markdown):
   return JSON.parse(response.content[0].text);
 }
 
-module.exports = { analyzeImage, searchItem, findProductImage, findProductImages, suggestOutfit };
+// Natural language search — Claude understands the query and ranks matching items
+async function smartSearch(query, items) {
+  const catalog = items.map(i => ({
+    id: i.id, name: i.name, category: i.category,
+    color: i.color, brand: i.brand || null, tags: i.tags || []
+  }));
+
+  const response = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 256,
+    messages: [{
+      role: 'user',
+      content: `You are searching a personal clothing wardrobe. The user's query: "${query}"
+
+Wardrobe items: ${JSON.stringify(catalog)}
+
+Return the IDs of items that best match the query, ranked from most to least relevant.
+Be generous — include loosely related items. If nothing matches, return [].
+Respond ONLY with valid JSON (no markdown): {"ids":["id1","id2",...]}`
+    }]
+  });
+
+  const raw = response.content[0].text.replace(/```json\n?|```/g, '').trim();
+  return JSON.parse(raw);
+}
+
+module.exports = { analyzeImage, searchItem, findProductImage, findProductImages, suggestOutfit, smartSearch };

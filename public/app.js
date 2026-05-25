@@ -63,23 +63,86 @@ function switchView(view) {
 
 // ── Sort & Search ─────────────────────────────────────────────────────────────
 
+let aiSearchActive = false;
+let aiSearchResults = null;
+
 function setupSortAndSearch() {
   const searchEl = document.getElementById('closet-search');
-  const sortEl = document.getElementById('closet-sort');
+  const sortEl   = document.getElementById('closet-sort');
+  const clearBtn = document.getElementById('btn-clear-search');
+  const aiBtn    = document.getElementById('btn-smart-search');
 
   let searchTimer;
   searchEl.addEventListener('input', () => {
+    clearBtn.classList.toggle('hidden', !searchEl.value);
+    // Typing cancels any active AI search
+    if (aiSearchActive) {
+      aiSearchActive = false;
+      aiSearchResults = null;
+      hideBanner();
+    }
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
-      currentSearch = searchEl.value.trim().toLowerCase();
+      currentSearch = searchEl.value.trim();
       loadCloset();
-    }, 220);
+    }, 180);
+  });
+
+  searchEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter') runAiSearch();
+  });
+
+  aiBtn.addEventListener('click', runAiSearch);
+
+  clearBtn.addEventListener('click', () => {
+    searchEl.value = '';
+    currentSearch = '';
+    aiSearchActive = false;
+    aiSearchResults = null;
+    clearBtn.classList.add('hidden');
+    hideBanner();
+    loadCloset();
   });
 
   sortEl.addEventListener('change', () => {
     currentSort = sortEl.value;
     loadCloset();
   });
+}
+
+async function runAiSearch() {
+  const query = document.getElementById('closet-search').value.trim();
+  if (!query) return;
+
+  const aiBtn = document.getElementById('btn-smart-search');
+  aiBtn.textContent = '⏳';
+  aiBtn.disabled = true;
+
+  try {
+    const data = await apiFetch('/items/smart-search', {
+      method: 'POST',
+      body: JSON.stringify({ query })
+    });
+    aiSearchActive = true;
+    aiSearchResults = data.items;
+    showBanner(`✨ AI Search: "${query}" — ${data.items.length} result${data.items.length !== 1 ? 's' : ''}`);
+    renderItemGrid('items-grid', data.items, false);
+  } catch {
+    showToast('AI search failed — try again', true);
+  } finally {
+    aiBtn.textContent = '✨';
+    aiBtn.disabled = false;
+  }
+}
+
+function showBanner(text) {
+  const el = document.getElementById('ai-search-banner');
+  el.textContent = text;
+  el.classList.remove('hidden');
+}
+
+function hideBanner() {
+  document.getElementById('ai-search-banner').classList.add('hidden');
 }
 
 function applySort(items) {
@@ -95,11 +158,24 @@ function applySort(items) {
 
 function applySearch(items) {
   if (!currentSearch) return items;
-  return items.filter(i =>
-    [i.name, i.brand, i.color, i.category, ...(i.tags || [])]
-      .filter(Boolean)
-      .some(f => f.toLowerCase().includes(currentSearch))
-  );
+
+  // Fuse.js fuzzy search — handles typos, partial words, multi-field
+  const fuse = new Fuse(items, {
+    keys: [
+      { name: 'name',     weight: 0.45 },
+      { name: 'brand',    weight: 0.25 },
+      { name: 'color',    weight: 0.15 },
+      { name: 'category', weight: 0.08 },
+      { name: 'tags',     weight: 0.07 }
+    ],
+    threshold: 0.4,
+    ignoreLocation: true,
+    minMatchCharLength: 2,
+    includeScore: true
+  });
+
+  const results = fuse.search(currentSearch);
+  return results.map(r => r.item);
 }
 
 // ── Closet ────────────────────────────────────────────────────────────────────
@@ -125,6 +201,7 @@ function setupFilters() {
 }
 
 async function loadCloset() {
+  if (aiSearchActive) return; // AI search result is already rendered
   const params = [];
   if (currentFilter) params.push(`category=${encodeURIComponent(currentFilter)}`);
   if (currentTagFilter) params.push(`tag=${encodeURIComponent(currentTagFilter)}`);
