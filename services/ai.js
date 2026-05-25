@@ -59,15 +59,14 @@ async function searchItem(query) {
   return JSON.parse(response.content[0].text);
 }
 
-// Find a real product photo. Tries Google Custom Search first (accurate product images),
-// falls back to Unsplash. Returns null if neither is configured.
+// Find a real product photo. Priority: Google → Bing → Unsplash. Returns null if none configured.
 async function findProductImage(details) {
-  // Build the tightest possible query: brand + product name + color — no category noise
+  // Tightest possible query: brand + product name + color
   const q = [details.brand, details.name, details.color]
     .filter(Boolean)
     .join(' ');
 
-  // ── Google Custom Search (best for real product images) ──────────────────────
+  // ── Google Custom Search ─────────────────────────────────────────────────────
   const googleKey = process.env.GOOGLE_API_KEY;
   const googleCx  = process.env.GOOGLE_CSE_ID;
   if (googleKey && googleCx) {
@@ -85,7 +84,24 @@ async function findProductImage(details) {
     } catch {}
   }
 
-  // ── Unsplash fallback ────────────────────────────────────────────────────────
+  // ── Bing Image Search (best free alternative for real product images) ────────
+  const bingKey = process.env.BING_API_KEY;
+  if (bingKey) {
+    try {
+      const url = `https://api.bing.microsoft.com/v7.0/images/search` +
+        `?q=${encodeURIComponent(q + ' product photo')}&count=1&safeSearch=Moderate&imageType=Photo`;
+      const res = await fetch(url, {
+        headers: { 'Ocp-Apim-Subscription-Key': bingKey }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const link = data.value?.[0]?.thumbnailUrl || data.value?.[0]?.contentUrl;
+        if (link) return link;
+      }
+    } catch {}
+  }
+
+  // ── Unsplash fallback (lifestyle/editorial, less accurate) ───────────────────
   const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
   if (unsplashKey) {
     try {
