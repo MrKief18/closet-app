@@ -78,16 +78,70 @@ async function searchItem(query) {
   return JSON.parse(raw);
 }
 
-// Identify exact product from description, then find real listings via Google Shopping
+// Identify exact product + real color variants with images + shopping listings
 async function searchItemOnline(query) {
-  // Step 1: Claude resolves the description to a precise product
-  const details = await searchItem(query);
-
-  // Step 2: Google Shopping search for real product listings
-  const q = [details.brand, details.name, details.color].filter(Boolean).join(' ');
   const serpKey = process.env.SERPAPI_KEY;
-  let products = [];
 
+  // Step 1: Claude identifies product AND lists real color variants in one call
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 768,
+    messages: [{
+      role: 'user',
+      content: `You are an expert fashion product identifier.
+
+User description: "${query}"
+
+1. Resolve to the correct official product (fix typos, brand naming, etc.)
+2. List 5–6 real color variants that actually exist for this product.
+
+Respond ONLY with valid JSON (no markdown):
+{
+  "name": "official product name",
+  "brand": "exact brand or null",
+  "category": "tops|bottoms|shoes|outerwear|accessories",
+  "size": null,
+  "variants": [
+    {"color": "color name exactly as sold", "searchQuery": "brand name color for Google image search"}
+  ]
+}`
+    }]
+  });
+
+  const raw = response.content[0].text.replace(/```json\n?|```/g, '').trim();
+  const parsed = JSON.parse(raw);
+
+  const details = {
+    name:     parsed.name,
+    brand:    parsed.brand || null,
+    category: parsed.category,
+    color:    parsed.variants?.[0]?.color || null,
+    size:     parsed.size || null
+  };
+  const variants = parsed.variants || [];
+
+  // Step 2: Fetch one image per color variant — all in parallel
+  const variantsWithImages = await Promise.all(variants.map(async v => {
+    let imageUrl = null;
+    if (serpKey) {
+      try {
+        const url = `https://serpapi.com/search.json` +
+          `?engine=google_images&q=${encodeURIComponent(v.searchQuery)}&num=1&api_key=${serpKey}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          imageUrl = data.images_results?.[0]?.original
+                  || data.images_results?.[0]?.thumbnail
+                  || null;
+        }
+      } catch {}
+    }
+    return { color: v.color, imageUrl };
+  }));
+
+  // Step 3: Google Shopping for pricing / retailer info
+  const q = [details.brand, details.name].filter(Boolean).join(' ');
+  let products = [];
   if (serpKey) {
     try {
       const url = `https://serpapi.com/search.json` +
@@ -106,7 +160,7 @@ async function searchItemOnline(query) {
     } catch {}
   }
 
-  return { details, products };
+  return { details, variants: variantsWithImages, products };
 }
 
 // Return up to `count` product image URLs for user selection

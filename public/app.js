@@ -832,10 +832,13 @@ async function doSearch() {
   try {
     const data = await apiFetch(`/items/search?q=${encodeURIComponent(q)}`);
 
+    if (data.variants && data.variants.length > 0) {
+      renderColorVariants(data.variants, data.details);
+    }
     if (data.products && data.products.length > 0) {
       renderShoppingResults(data.products, data.details, data.imageUrl);
-    } else {
-      // No shopping results — fall back to direct form fill
+    }
+    if (!data.variants?.length && !data.products?.length) {
       identifiedImageUrl = data.imageUrl || null;
       populateIdentifiedForm(data.details);
     }
@@ -846,6 +849,40 @@ async function doSearch() {
     loadingEl.classList.add('hidden');
     searchBtn.disabled = false;
   }
+}
+
+function renderColorVariants(variants, details) {
+  const grid = document.getElementById('color-variants-grid');
+  const wrapper = document.getElementById('color-variants');
+
+  grid.innerHTML = variants.map((v, i) => `
+    <div class="color-variant-card" data-idx="${i}">
+      ${v.imageUrl
+        ? `<img class="color-variant-img" src="${esc(v.imageUrl)}" alt="${esc(v.color)}"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+        : ''
+      }
+      <div class="color-variant-placeholder" style="${v.imageUrl ? 'display:none' : ''}">${catIcon(details.category)}</div>
+      <div class="color-variant-name">${esc(v.color)}</div>
+    </div>`).join('');
+
+  wrapper.classList.remove('hidden');
+
+  grid.querySelectorAll('.color-variant-card').forEach((card, idx) => {
+    card.addEventListener('click', () => {
+      grid.querySelectorAll('.color-variant-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+
+      const v = variants[idx];
+      identifiedImageUrl = v.imageUrl || null;
+
+      // Update form with this color and pre-fill
+      populateIdentifiedForm({ ...details, color: v.color });
+    });
+  });
+
+  // Auto-select the first card
+  grid.querySelector('.color-variant-card')?.click();
 }
 
 function renderShoppingResults(products, fallbackDetails, fallbackImageUrl) {
@@ -910,6 +947,8 @@ function resetIdentifiedForm() {
   document.getElementById('btn-analyze').classList.add('hidden');
   document.getElementById('camera-input').value = '';
   document.getElementById('search-input').value = '';
+  document.getElementById('color-variants').classList.add('hidden');
+  document.getElementById('color-variants-grid').innerHTML = '';
   document.getElementById('shopping-results').classList.add('hidden');
   document.getElementById('shopping-grid').innerHTML = '';
   document.querySelectorAll('.tag-check').forEach(cb => { cb.checked = false; });

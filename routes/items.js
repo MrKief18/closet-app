@@ -26,10 +26,10 @@ router.get('/search', async (req, res) => {
   const { q } = req.query;
   if (!q) return res.status(400).json({ error: 'Query parameter q is required' });
   try {
-    const { details, products } = await searchItemOnline(q);
+    const { details, variants, products } = await searchItemOnline(q);
 
-    // Pick the best image: first shopping thumbnail, then SerpAPI image search
-    const imageUrl = products[0]?.thumbnail || await findProductImage(details);
+    // Best image: first variant's image → first shopping thumbnail → image search fallback
+    const imageUrl = variants[0]?.imageUrl || products[0]?.thumbnail || await findProductImage(details);
 
     if (req.query.save === 'true') {
       const items = readItems();
@@ -42,10 +42,10 @@ router.get('/search', async (req, res) => {
       };
       items.push(newItem);
       writeItems(items);
-      return res.status(201).json({ query: q, details, imageUrl, products, saved: newItem });
+      return res.status(201).json({ query: q, details, variants, imageUrl, products, saved: newItem });
     }
 
-    res.json({ query: q, details, imageUrl, products });
+    res.json({ query: q, details, variants, imageUrl, products });
   } catch (err) {
     res.status(500).json({ error: 'Search failed', detail: err.message });
   }
