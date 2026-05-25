@@ -164,7 +164,7 @@ Respond ONLY with valid JSON (no markdown):
   return JSON.parse(response.content[0].text);
 }
 
-// Natural language search — Claude understands the query and ranks matching items
+// Smart search — identifies the exact product from a loose description, then matches closet items
 async function smartSearch(query, items) {
   const catalog = items.map(i => ({
     id: i.id, name: i.name, category: i.category,
@@ -172,17 +172,30 @@ async function smartSearch(query, items) {
   }));
 
   const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 256,
+    model: 'claude-sonnet-4-6',
+    max_tokens: 512,
     messages: [{
       role: 'user',
-      content: `You are searching a personal clothing wardrobe. The user's query: "${query}"
+      content: `You are an expert fashion product identifier and personal closet search assistant.
 
-Wardrobe items: ${JSON.stringify(catalog)}
+User query: "${query}"
 
-Return the IDs of items that best match the query, ranked from most to least relevant.
-Be generous — include loosely related items. If nothing matches, return [].
-Respond ONLY with valid JSON (no markdown): {"ids":["id1","id2",...]}`
+Step 1 — Identify the real product: Resolve the query to the correct official product name, fixing any typos, abbreviations, and brand-specific naming (e.g. "Style 4" → "Fit 4", "Jens" → "Jeans", "Rag and Bone" → "Rag & Bone"). Be as specific as possible — full official product name, exact brand, category, and a color estimate if inferable.
+
+Step 2 — Search the wardrobe: Find any items in the wardrobe that match this product or are closely related. Rank by relevance. If nothing matches, return [].
+
+Wardrobe: ${JSON.stringify(catalog)}
+
+Respond ONLY with valid JSON (no markdown, no explanation):
+{
+  "identified": {
+    "name": "full official product name",
+    "brand": "exact brand name",
+    "category": "tops|bottoms|shoes|outerwear|accessories",
+    "color": "color or null"
+  },
+  "ids": ["matching wardrobe item ids ranked best-first"]
+}`
     }]
   });
 

@@ -125,8 +125,23 @@ async function runAiSearch() {
     });
     aiSearchActive = true;
     aiSearchResults = data.items;
-    showBanner(`✨ AI Search: "${query}" — ${data.items.length} result${data.items.length !== 1 ? 's' : ''}`);
-    renderItemGrid('items-grid', data.items, false);
+
+    const id = data.identified;
+    const productLabel = id ? `${id.brand ? id.brand + ' ' : ''}${id.name}` : query;
+
+    if (data.items.length > 0) {
+      // Found in closet
+      showBanner(`✨ <strong>${esc(productLabel)}</strong> — ${data.items.length} match${data.items.length !== 1 ? 'es' : ''} in your closet`);
+      renderItemGrid('items-grid', data.items, false);
+    } else if (id) {
+      // Not in closet but product identified — offer to add it
+      showBannerWithAdd(productLabel, id);
+      document.getElementById('items-grid').innerHTML =
+        `<p class="empty-state"><span class="empty-state-icon">🔍</span><strong>${esc(productLabel)}</strong> isn't in your closet yet.</p>`;
+    } else {
+      showBanner(`✨ No matches found for "${esc(query)}"`);
+      renderItemGrid('items-grid', [], false);
+    }
   } catch {
     showToast('AI search failed — try again', true);
   } finally {
@@ -135,9 +150,26 @@ async function runAiSearch() {
   }
 }
 
-function showBanner(text) {
+function showBannerWithAdd(label, identified) {
   const el = document.getElementById('ai-search-banner');
-  el.textContent = text;
+  el.innerHTML = `✨ Identified: <strong>${esc(label)}</strong> — not in your closet &nbsp;
+    <button class="btn-banner-add" id="btn-add-identified">+ Add to Closet</button>`;
+  el.classList.remove('hidden');
+
+  document.getElementById('btn-add-identified').addEventListener('click', () => {
+    // Pre-fill the Add Item search with the identified product name
+    switchView('add');
+    document.getElementById('btn-show-search').click();
+    const searchInput = document.getElementById('search-input');
+    searchInput.value = `${identified.brand ? identified.brand + ' ' : ''}${identified.name}`;
+    // Auto-trigger search
+    document.getElementById('btn-do-search').click();
+  });
+}
+
+function showBanner(html) {
+  const el = document.getElementById('ai-search-banner');
+  el.innerHTML = html;
   el.classList.remove('hidden');
 }
 

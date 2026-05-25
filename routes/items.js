@@ -55,10 +55,9 @@ router.post('/smart-search', async (req, res) => {
   if (!query) return res.status(400).json({ error: 'query is required' });
   try {
     const items = readItems();
-    if (!items.length) return res.json({ items: [] });
-    const result = await smartSearch(query, items);
+    const result = await smartSearch(query, items.length ? items : []);
     const matched = (result.ids || []).map(id => items.find(i => i.id === id)).filter(Boolean);
-    res.json({ items: matched });
+    res.json({ items: matched, identified: result.identified || null });
   } catch (err) {
     res.status(500).json({ error: 'Smart search failed', detail: err.message });
   }
